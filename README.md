@@ -1,2 +1,2 @@
 # CrystalSubstructureSearcher
-Tool for searching low-periodic substructures in crystalline solids
+Tool for searching for the low-periodic substructures in crystalline solids
