@@ -17,7 +17,6 @@ import utils
 from structure_classes import Substructure, CrystalSubstructures, TargetSubstructure, Contact
 
 from time import time
-from line_profiler_pycharm import profile
 
 
 class CrystalSubstructureSearcher:
