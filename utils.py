@@ -1,12 +1,23 @@
 import itertools
-from typing import Tuple
+import json
+from typing import Tuple, Dict, Sequence, Union
 from math import gcd
+from ast import literal_eval
 
 import pandas as pd
 import numpy as np
 
+from pymatgen.core.operations import SymmOp
+from pymatgen.core.structure import Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.core.sites import PeriodicSite
+
 
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
+LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
+WYCKOFF_CSV_PATH = "./wyckoff_list.csv"  # csv file with WPs data
+BV_PARAMETERS_EXCEL_TABLE_PATH = "./BV_estimated_23-04-2024.xlsx"  # excel file with BV parameters
+
 
 class StructureGraphAnalysisException(Exception):
     """
@@ -41,8 +52,6 @@ class IntraContactsRestorationError(StructureGraphAnalysisException):
     Fragment dimensionality is not preserved during intrafragment contacts restoration
     """
 
-
-BV_PARAMETERS_EXCEL_TABLE_PATH = r'.\BV_estimated_23-04-2024.xlsx'
 
 try:
     df_bvparams = pd.read_excel(BV_PARAMETERS_EXCEL_TABLE_PATH, index_col=0).loc[:,
@@ -184,7 +193,7 @@ def calculate_ltm_for_hkl(target_hkl, initial_lattice_vectors) -> Tuple[np.ndarr
 
     if np.linalg.det(new_lattice_vectors) < 0:
         print("np.linalg.det(new_lattice_vectors) < 0")
-        # new_lattice_vectors *= -1
+        new_lattice_vectors *= -1
 
     # Ratio of volumes
     volume_ratio = new_volume / initial_volume
@@ -320,7 +329,7 @@ def calculate_ltm_for_uvw(target_uvw, initial_lattice_vectors, N=2) -> Tuple[np.
     #     slab_scale_factor *= -1
 
 
-def calculate_area(oriented_cell):
+def calculate_area(oriented_cell: np.ndarray) -> float:
 
     a = oriented_cell[0]
     b = oriented_cell[1]
@@ -330,7 +339,7 @@ def calculate_area(oriented_cell):
     return S
 
 
-def get_zone_axis(h1k1l1, h2k2l2):
+def get_zone_axis(h1k1l1: Sequence, h2k2l2: Sequence) -> Union[None, np.ndarray]:
     """
     Determine the zone axis [uvw] from the intersection of two planes using the crystallographic zone law.
 
@@ -355,3 +364,158 @@ def get_zone_axis(h1k1l1, h2k2l2):
         zone_axis = (zone_axis / gcd).astype(int)
 
     return zone_axis
+
+
+def get_wyckoffs_dict(space_group_number: int) -> Dict:
+    """
+    Loads Wyckoff positions for a given space group number from a CSV file.
+
+    Args:
+        space_group_number (int): The international space group number.
+
+    Returns:
+        dict: A dict of Wyckoff positions, containing a list of SymmOp operations.
+    """
+
+    # Load Wyckoff position data from CSV
+    df = pd.read_csv(WYCKOFF_CSV_PATH, index_col=0)
+
+    # Extract the Wyckoff positions for the given space group number
+    wyckoff_strings = literal_eval(df.loc[space_group_number, "0"])  # Convert string to list
+
+    wyckoffs = []
+    for wp_group in wyckoff_strings:
+        wyckoff_ops = [SymmOp.from_xyz_string(op) for op in wp_group]
+        wyckoffs.append(wyckoff_ops)
+
+    length = len(wyckoffs)
+    wyckoffs_dict = {}
+    for i in range(len(wyckoffs)):
+        mult = len(wyckoffs[i])
+        letter = LETTERS[length - 1 - i]
+        wyckoffs_dict[f"{mult}{letter}"] = wyckoffs[i]
+
+    # reverse dict
+    wyckoffs_dict = {k: v for k, v in list(wyckoffs_dict.items())[::-1]}
+
+    return wyckoffs_dict
+
+
+def get_wyckoff_position_from_xyz(wyckoffs_dict: Dict, xyz: Sequence, decimals: int = 4) -> str:
+    """
+    Determines the Wyckoff position of a given fractional coordinate.
+
+    Args:
+        wyckoffs_dict (int): Dictionary with WPs for a given Space Group.
+        xyz (tuple or np.ndarray): Fractional coordinate [x, y, z].
+        decimals (int): Number of decimals for rounding.
+
+    Returns:
+        list: The Wyckoff position (list of SymmOp) if found, otherwise None.
+    """
+    xyz = np.round(np.array(xyz, dtype=float), decimals=decimals)
+    xyz -= np.floor(xyz)
+    # Iterate over Wyckoff positions and check if the point belongs
+    for letter, wp_ops in wyckoffs_dict.items():
+        # Apply all symmetry operations in the Wyckoff position to xyz
+        orbit = np.array([op.operate(xyz) for op in wp_ops])
+        orbit -= np.floor(orbit)
+
+        # Check if the transformed points match the original point
+        if np.any(np.all(np.isclose(orbit, xyz, atol=1e-4), axis=1)):
+            # Ensure all transformed points are unique
+            if len(orbit) == len(np.unique(orbit.round(decimals=decimals), axis=0)):
+                return letter  # Return the matching Wyckoff position letter
+    return '--'
+    # raise RuntimeError(f"Cannot find the suitable Wyckoff position for the given input position {xyz}")
+
+
+def determine_wyckoff_position(
+    frac_coords: Tuple[float, float, float], struct: Structure, symprec=0.01, dist_tol=0.01
+) -> str:
+    """
+    Determines the Wyckoff position of a given fractional coordinate in a unit cell.
+    Based on https://github.com/SMTG-Bham/doped/blob/a4ea4c8a8a206785cba1f5d9f9db86aee6919b76/doped/utils/symmetry.py#L328C5-L328C16
+
+    Args:
+        frac_coords (Tuple[float, float, float]): Fractional coordinates of the point.
+        struct (Structure): pymatgen Structure object corresponding to the unit cell.
+        symprec (float, optional): Symmetry precision for SpacegroupAnalyzer (default: 0.01).
+        dist_tol (float, optional): Distance tolerance for equivalent site determination (default: 0.01).
+
+    Returns:
+        str: The Wyckoff position label (e.g., "4a", "2b", etc.).
+    """
+
+    try:
+        # Step 1: Compute symmetry operations
+        sga = SpacegroupAnalyzer(struct, symprec=symprec)
+        symm_ops = sga.get_symmetry_operations()
+
+        # Step 2: Get all equivalent sites for the input fractional coordinates
+        unique_sites = []
+        dummy_site = PeriodicSite("X", frac_coords, struct.lattice)  # Dummy atom to track symmetry effects
+
+        for symm_op in symm_ops:
+            transformed_site = symm_op.operate(frac_coords)
+            transformed_site = np.mod(transformed_site, 1)  # Bring into unit cell
+
+            # Check if this site is unique
+            if not unique_sites or np.linalg.norm(
+                np.dot(
+                    np.array([site.frac_coords for site in unique_sites]) - transformed_site,
+                    struct.lattice.matrix,
+                ), axis=-1
+            ).min() > dist_tol:
+                unique_sites.append(PeriodicSite("X", transformed_site, struct.lattice))
+
+        # Step 3: Create a new structure with the equivalent sites added
+        struct_with_sites = Structure(
+            struct.lattice,  # Keep the same lattice
+            [site.specie for site in struct.sites] + [site.specie for site in unique_sites],  # Combine species
+            [site.frac_coords for site in struct.sites] + [site.frac_coords for site in unique_sites],  # Combine fractional coords
+            to_unit_cell=True  # Ensure sites remain inside the unit cell
+        )
+
+        # Step 4: Recompute symmetry dataset with additional sites
+        sga_with_all_sites = SpacegroupAnalyzer(struct_with_sites, symprec=symprec)
+        symm_dataset = sga_with_all_sites.get_symmetry_dataset()
+
+        # Step 5: Compute Wyckoff multiplicity & label
+        conv_cell_factor = len(symm_dataset["std_positions"]) / len(symm_dataset["wyckoffs"])
+        multiplicity = int(conv_cell_factor * len(unique_sites))
+        wyckoff_label = f"{multiplicity}{symm_dataset['wyckoffs'][-1]}"
+    except Exception as e:
+        print(e.__class__.__name__)
+        wyckoff_label = '--'
+
+    return wyckoff_label
+
+
+def get_weighted_mean(seq: Sequence[Tuple[float, float]]) -> float:
+    """
+    Computes the weighted mean of a sequence of (value, weight) pairs.
+
+    Args:
+        seq (Sequence[Tuple[float, float]]): A sequence of tuples where each tuple contains (value, weight).
+
+    Returns:
+        float: The weighted mean of the input sequence.
+
+    Raises:
+        ValueError: If the total weight is zero to avoid division by zero.
+    """
+    numerator = sum(weight for _, weight in seq)
+
+    if numerator == 0:
+        raise ValueError("Total weight must not be zero when computing weighted mean.")
+
+    weighted_mean = sum(value * (weight / numerator) for value, weight in seq)
+    return weighted_mean
+
+
+class npEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.int32) or isinstance(obj, np.int64):
+            return int(obj)
+        return json.JSONEncoder.default(self, obj)

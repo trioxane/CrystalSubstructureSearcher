@@ -1,5 +1,5 @@
 from collections import defaultdict, Counter
-from typing import List, Dict, Union, Tuple, Set
+from typing import List, Dict, Union, Tuple, Set, Optional
 from pathlib import Path
 
 import networkx as nx
@@ -11,8 +11,71 @@ from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.graphs import StructureGraph
 from pymatgen.analysis.dimensionality import get_structure_components
 
+
+import utils
 from element_data import get_element_grouping_dict, ALVAREZ_VDW_RADIUS_DICT
-from utils import calculate_area
+
+
+class Contact:
+
+    def __init__(
+            self,
+            pmg_structure: Structure,
+            at1_idx: int,
+            at2_idx: int,
+            t: Tuple,
+            contact_characteristics: Dict,
+            element_grouping_dict: Optional[Dict] = None,
+            WPs_dict: Optional[Dict] = None,
+    ):
+
+        self.t: Tuple = t
+        self.at1_idx: int = at1_idx
+        self.at2_idx: int = at2_idx
+
+        self._fill_attributes(pmg_structure, contact_characteristics, element_grouping_dict, WPs_dict)
+
+    def _fill_attributes(
+            self, pmg_structure: Structure, contact_characteristics: Dict, element_grouping_dict: Dict, WPs_dict: Dict
+    ) -> None:
+
+        self.at1: str = pmg_structure[self.at1_idx].specie.symbol
+        self.at2: str = pmg_structure[self.at2_idx].specie.symbol
+        self.bond: str = '..'.join(sorted((self.at1, self.at2)))
+
+        if element_grouping_dict is not None:
+            self.at1_grouped: str = element_grouping_dict[self.at1]
+            self.at2_grouped: str = element_grouping_dict[self.at2]
+            self.bond_grouped: str = '..'.join(sorted((self.at1_grouped, self.at2_grouped)))
+        else:
+            self.bond_grouped = None
+
+        self.BV: float = contact_characteristics['BV']
+        self.BV_calc_method: str = contact_characteristics['BV_calc_method']
+        self.R: float = contact_characteristics['R']
+        self.A: float = contact_characteristics['A']
+        self.SA: float = contact_characteristics['SA']
+        self.PI: float = contact_characteristics['PI']
+
+        self.at1_frac_coords: np.ndarray = pmg_structure.frac_coords[self.at1_idx]
+        self.at2_frac_coords: np.ndarray = pmg_structure.frac_coords[self.at2_idx]
+
+        contact_midpoint = (self.at2_frac_coords + self.t + self.at1_frac_coords) / 2
+        # print(self.at1_frac_coords, self.t, self.at2_frac_coords)
+        # print(contact_midpoint)
+        self.contact_midpoint: np.ndarray = np.round(np.mod(contact_midpoint, 1.0), decimals=4)
+
+        if WPs_dict is not None:
+            # worse algo
+            # self.contact_midpoint_WP: str = utils.get_wyckoff_position_from_xyz(WPs_dict, contact_midpoint)
+            # bit better one, still not ideal and makes errors
+            self.contact_midpoint_WP: str = utils.determine_wyckoff_position(contact_midpoint, struct=pmg_structure)
+        else:
+            self.contact_midpoint_WP = ''
+
+    @classmethod
+    def from_data(cls, pmg_structure, at1_idx, at2_idx, t, contact_characteristics, element_grouping_dict, WPs_dict):
+        return cls(pmg_structure, at1_idx, at2_idx, t, contact_characteristics, element_grouping_dict, WPs_dict)
 
 
 class Substructure:
@@ -21,7 +84,7 @@ class Substructure:
             self,
             max_periodicity: int,
             sg: StructureGraph,
-            deleted_contacts: Union[None, defaultdict],
+            deleted_contacts: Optional[defaultdict],
             inter_contacts: Set,
             BVS: float,
     ):
@@ -49,6 +112,7 @@ class TargetSubstructure(Substructure):
             sg: StructureGraph,
             deleted_contacts: defaultdict,
             inter_contacts: Set,
+            intercomponent_contacts_in_original_cell: list[Contact],
             BVS: float,
             total_BVS: float,
             ltm_used: np.ndarray,
@@ -58,6 +122,7 @@ class TargetSubstructure(Substructure):
 
         self.total_BVS = total_BVS
         self.ltm_used = ltm_used
+        self.intercomponent_contacts_in_original_cell = intercomponent_contacts_in_original_cell
 
         self.component_charges: Dict[int, float] = None
         self.component_graphs: List[StructureGraph] = None
@@ -91,7 +156,11 @@ class TargetSubstructure(Substructure):
 
     def _get_unique_component_indices(self) -> None:
         """
-        Identify unique components of the substructure of the initial full crystal structure graph
+        Identifies unique graphs in a list of component graphs and returns the indices
+        of the last occurrence of each unique graph.
+
+        Returns:
+            list: Indices of the last occurrence of each unique graph.
         """
         # TODO check maybe store last appearances not the first ones
         # check graphs isomorphism by comparing node elements and edge distances
@@ -99,20 +168,37 @@ class TargetSubstructure(Substructure):
         edge_matcher = nx.algorithms.isomorphism.numerical_multiedge_match(attr='R', default=1.0, atol=1e-1)
 
         unique_component_indices = []
-        for i in range(len(self.component_graphs)):
+        for i in range(len(self.component_graphs) - 1, -1, -1):  # Iterate in reverse
             is_unique = True
-            for j in range(len(self.component_graphs)):
-                if i > j:
-                    if nx.is_isomorphic(
-                            self.component_graphs[i].graph,
-                            self.component_graphs[j].graph,
-                            node_match=node_matcher,
-                            edge_match=edge_matcher,
-                    ):
-                        is_unique = False
-                        break
+            for j in range(len(self.component_graphs) - 1, i, -1):  # Check later indices first
+                if nx.is_isomorphic(
+                        self.component_graphs[i].graph,
+                        self.component_graphs[j].graph,
+                        node_match=node_matcher,
+                        edge_match=edge_matcher,
+                ):
+                    is_unique = False
+                    break
             if is_unique:
                 unique_component_indices.append(i)
+
+        unique_component_indices = sorted(unique_component_indices)
+
+        # unique_component_indices = []
+        # for i in range(len(self.component_graphs)):
+        #     is_unique = True
+        #     for j in range(len(self.component_graphs)):
+        #         if i > j:
+        #             if nx.is_isomorphic(
+        #                     self.component_graphs[i].graph,
+        #                     self.component_graphs[j].graph,
+        #                     node_match=node_matcher,
+        #                     edge_match=edge_matcher,
+        #             ):
+        #                 is_unique = False
+        #                 break
+        #     if is_unique:
+        #         unique_component_indices.append(i)
 
         print(f'unique_component_indices: {unique_component_indices}')
         self.unique_component_indices = unique_component_indices
@@ -182,10 +268,10 @@ class CrystalSubstructures:
 
         self._ltm_applied = css_instance._ltm
 
-        self._BVS_x_periodicity: Dict = None
-        self._BVS_x_periodicity_normalized: Union[Dict, None] = None
+        self._BVS_x_periodicity: Optional[Dict] = None
+        self._BVS_x_periodicity_normalized: Optional[Dict] = None
 
-        self.target_substructure: Union[None, TargetSubstructure] = None
+        self.target_substructure: Optional[TargetSubstructure] = None
         self.substructures: defaultdict[int, List[Substructure]] = defaultdict()
 
         self._calculate_BVS_x_periodicity()
@@ -216,7 +302,7 @@ class CrystalSubstructures:
 
     def _calculate_BVS_x_periodicity(self) -> None:
 
-        self._BVS_x_periodicity = {p: substr[0].BVS for p, substr in self.iter_substructures()}
+        self._BVS_x_periodicity = {int(p): substr[0].BVS for p, substr in self.iter_substructures()}
 
         partition_abs = np.abs(np.ediff1d(list(self._BVS_x_periodicity.values())))
         partition_diff = np.ediff1d(list(self._BVS_x_periodicity.values()))
@@ -246,6 +332,7 @@ class CrystalSubstructures:
             self,
             save_components_path: str = './',
             save_as_cif: bool = True,
+            save_bulk_as_cif: bool = False,
             store_symmetrized_cell: bool = False,
             vacuum_space: float = 20.0,
     ) -> None:
@@ -291,12 +378,12 @@ class CrystalSubstructures:
             )
 
             # layer_w_vacuum2.to('check_layer_w_vacuum2.cif')
-            S1 = calculate_area(layer_w_vacuum2.lattice.matrix)
+            S1 = utils.calculate_area(layer_w_vacuum2.lattice.matrix)
 
             sga = SpacegroupAnalyzer(layer_w_vacuum2)
             layer_w_vacuum_symmetrised = sga.get_conventional_standard_structure()
             # layer_w_vacuum_symmetrised.to('check_layer_w_vacuum_symmetrised.cif')
-            S2 = calculate_area(layer_w_vacuum_symmetrised.lattice.matrix)
+            S2 = utils.calculate_area(layer_w_vacuum_symmetrised.lattice.matrix)
 
             # TODO skip at the moment standardizing because in some cases (ICSD 653676 or 262075)
             #  layer in the standardized cell is not in (001) plane
@@ -329,20 +416,24 @@ class CrystalSubstructures:
 
         if self.target_substructure is not None:
 
+            if save_bulk_as_cif:
+                self.target_substructure.sg.structure.to(
+                    Path(save_components_path) / f"{self.crystal_graph_name}_bulk_transformed.cif", fmt='cif'
+                )
+
+            print('unique_component_indices:', self.target_substructure.unique_component_indices)
             for idx, component in enumerate(
                     self.target_substructure.iter_components(inc_orientation=True, inc_site_ids=False)
             ):
-
                 component_sg = component['structure_graph']
                 periodicity = component['dimensionality']
                 component_composition = component_sg.structure.composition.formula.replace(" ", "")
-                print('in save_substructure_components:', idx, periodicity, component['orientation'], component_composition)
-                print('unique_component_indices', self.target_substructure.unique_component_indices)
+                print('save_substructure_components:', idx, periodicity, component['orientation'], component_composition)
 
                 if (
                         (idx in self.target_substructure.unique_component_indices) and
                         (periodicity == self.target_periodicity) and
-                        (self.target_periodicity == 2) # for the time being only layer saving is available
+                        (self.target_periodicity == 2)  # for the time being only layer saving is available
                 ):
 
                     S, geometric_layer_thickness, physical_layer_thickness = None, None, None
@@ -370,6 +461,7 @@ class CrystalSubstructures:
                         # make supercell; the bond translation vectors "to_jimage" will be recalculated
                         g_new = component_sg * [1, 1, 2]
 
+                        restoration_succeeded = False
                         for _, component in enumerate(
                                 get_structure_components(g_new, inc_orientation=True, inc_site_ids=False)
                         ):
@@ -383,8 +475,13 @@ class CrystalSubstructures:
                                 else:
                                     component_structure = component_sg.structure
 
+                                restoration_succeeded = True
+
                                 if save_as_cif:
                                     component_structure.to(save_path, fmt='cif')
+
+                        if not restoration_succeeded:
+                            raise utils.StructureGraphAnalysisException("pymatgen error")
 
                     self.target_substructure.component_dimensions[idx] = {
                         'S': S,
@@ -443,6 +540,8 @@ class CrystalSubstructureSearcherResults:
 
         if crystal_substructures.target_substructure is not None:
 
+            self.structure = crystal_substructures.target_substructure.sg.structure
+            self.ltm_used = crystal_substructures.target_substructure.ltm_used
             self.intra_bvs = crystal_substructures.target_substructure.BVS
             self.total_bvs = crystal_substructures.target_substructure.total_BVS
             self.unique_component_indices = crystal_substructures.target_substructure.unique_component_indices
@@ -456,12 +555,9 @@ class CrystalSubstructureSearcherResults:
 
             self._inter_contacts = crystal_substructures.target_substructure.inter_contacts
             self._deleted_contacts = crystal_substructures.target_substructure.deleted_contacts
+            self.intercomponent_contacts_in_original_cell = crystal_substructures.target_substructure.intercomponent_contacts_in_original_cell
 
             self._element_grouping_dict = get_element_grouping_dict(grouping=element_grouping)
-
-            self.original_cell_substructure_orientation = self._get_original_substructure_orientation(
-                crystal_substructures.target_substructure.ltm_used,
-            )
 
             self._calculate_additional_results()
 
@@ -484,12 +580,15 @@ class CrystalSubstructureSearcherResults:
             self.xbvs = np.nan
             self.intercomponent_contact_atoms = dict()
             self.intercomponent_contact_atoms_groups = dict()
-            self.inter_contacts_bv_estimate = dict()
+            self.intercomponent_contacts_bv_estimate = dict()
+            self.intercomponent_contacts_area = dict()
+            self.intercomponent_contacts_in_original_cell = set()
 
             self.mean_inter_bv = np.nan
             self.inter_bvs_per_interface = np.nan
+            self.contact_A_weighted_inter_bv = np.nan
 
-            self.original_cell_substructure_orientation = ()
+            self.intercomponent_contact_midpoint_WP = ''
 
     @property
     def show_monitor(self):
@@ -508,34 +607,65 @@ class CrystalSubstructureSearcherResults:
             index=self.BVS_x_periodicity_normalized.keys()
         )
 
-    def _get_original_substructure_orientation(self, original_cell_LTM) -> Tuple:
-        return tuple(np.linalg.inv(original_cell_LTM).dot(np.array([0, 0, 1])).astype(int))
+    def _get_original_substructure_orientations(self, transformed_cell_orientation: Tuple) -> Union[str, Tuple]:
+        if transformed_cell_orientation is not None:
+            return tuple(np.linalg.inv(self.ltm_used).dot(transformed_cell_orientation).astype(int))
+        else:
+            return ''
 
     def _calculate_additional_results(self) -> None:
 
         self.inter_bvs = self.total_bvs - self.intra_bvs
         self.xbvs = self.intra_bvs / self.total_bvs
+        self.inter_bvs_per_interface = self.inter_bvs / self.components_per_cell_count  # TODO: check this division
 
-        inter_contacts_bv_estimate = []
-        intercomponent_contact_atoms = []
-        intercomponent_contact_atoms_groups = []
-        # Dict self.deleted_contacts:
+        # these data correspond to the transformed cell
+        intercomponent_contacts = []
+        # dictionary self.deleted_contacts
         # ((at1_string, at2_string), BV_float): List[Tuple[Tuple[at1_idx_int, at2_idx_int, Tuple[translation]], Dict]
         for contact_type, contacts_list in self._deleted_contacts.items():
             for contact in contacts_list:
                 if contact[0] in self._inter_contacts:
-                    intercomponent_contact_atoms.append('..'.join(contact_type[0]))
-                    intercomponent_contact_atoms_groups.append('..'.join([self._element_grouping_dict[atom] for atom in contact_type[0]]))
-                    inter_contacts_bv_estimate.append(contact[1]['BV_calc_method'])
 
-        self.intercomponent_contact_atoms = pd.Series(intercomponent_contact_atoms).value_counts().to_dict()
-        self.intercomponent_contact_atoms_groups = pd.Series(intercomponent_contact_atoms_groups).value_counts().to_dict()
-        self.inter_contacts_bv_estimate = pd.Series(inter_contacts_bv_estimate).value_counts(normalize=True)\
-                                                                               .apply(lambda v: round(v, 4))\
-                                                                               .to_dict()
+                    intercomponent_contacts.append(
+                        Contact.from_data(
+                            pmg_structure=self.structure,
+                            at1_idx=contact[0][0],
+                            at2_idx=contact[0][1],
+                            t=contact[0][2],
+                            contact_characteristics=contact[1],
+                            element_grouping_dict=self._element_grouping_dict,
+                            WPs_dict=None,
+                        )
+                    )
 
-        self.mean_inter_bv = self.inter_bvs / len(intercomponent_contact_atoms)
-        self.inter_bvs_per_interface = self.inter_bvs / self.components_per_cell_count
+        # self.intercomponent_contacts = intercomponent_contacts
+        self.mean_inter_bv = self.inter_bvs / len(intercomponent_contacts)
+        BV_A = [(c.BV, c.A) for c in intercomponent_contacts]
+        self.contact_A_weighted_inter_bv = utils.get_weighted_mean(BV_A)
+        BV_count = [(c.BV, 1) for c in intercomponent_contacts]
+        self.weighted_inter_bv = utils.get_weighted_mean(BV_count)
+
+        dd = defaultdict(float)
+        for contact in intercomponent_contacts:
+            dd[contact.bond] += contact.A
+        self.intercomponent_contacts_area = {k: round(v, 2) for k, v in dd.items()}
+
+        self.intercomponent_contact_atoms = pd.Series(
+            [c.bond for c in intercomponent_contacts]).value_counts().to_dict()
+        self.intercomponent_contact_atoms_groups = pd.Series(
+            [c.bond_grouped for c in intercomponent_contacts]).value_counts().to_dict()
+        self.intercomponent_contacts_bv_estimate = pd.Series(
+            [c.BV_calc_method for c in intercomponent_contacts]
+        ).value_counts(normalize=True).apply(lambda v: round(v, 4)).to_dict()
+
+        # these data correspond to the original cell
+        if getattr(self.intercomponent_contacts_in_original_cell.copy().pop(), 'contact_midpoint_WP', False):
+            self.intercomponent_contact_midpoint_WP = sorted(
+                {(c.bond, round(c.R, 3), c.contact_midpoint_WP)
+                 for c in self.intercomponent_contacts_in_original_cell},
+                key=lambda v: v[0],
+            )
 
         return None
 
@@ -555,22 +685,6 @@ class CrystalSubstructureSearcherResults:
 
         return ''.join(formatted_string)
 
-    def BVSs(self) -> Dict:
-        """
-        Show the bond valence data.
-
-        Returns:
-            dict: Dictionary containing bond valence data.
-        """
-        return {
-            'xbvs': self.xbvs,
-            'mean_inter_bv': self.mean_inter_bv,
-            'inter_bvs_per_interface': self.inter_bvs_per_interface,
-            'intra_bvs': self.intra_bvs,
-            'inter_bvs': self.inter_bvs,
-            'total_bvs': self.total_bvs,
-        }
-
     def as_dict(self) -> Dict:
         """
         Get the results as a dictionary.
@@ -578,19 +692,18 @@ class CrystalSubstructureSearcherResults:
         Returns:
             dict: Dictionary containing results.
         """
-        # self.inter_bvs_per_unit_area = self.inter_bvs / self.components_per_cell_count
         results = {
             'crystal_graph_name': self.crystal_graph_name,
             'bond_property': self.bond_property,
             'target_periodicity': self.target_periodicity,
-            'orientation_in_original_cell': self.original_cell_substructure_orientation,
+            # 'LTM': tuple(tuple(arr) for arr in self.ltm_used),
+            'orientation_in_original_cell': [self._get_original_substructure_orientations(self.component_orientations[idx])
+                                             for idx in self.unique_component_indices],
             'composition': [self.component_formulas[idx] for idx in self.unique_component_indices],
             'periodicity': [self.component_periodicity[idx] for idx in self.unique_component_indices],
             'estimated_charge': [self.component_charges[idx] for idx in self.unique_component_indices],
             # 'S_A^2': [self.component_dimensions.get(idx, dict()).get('S', np.nan)
             #           for idx in self.unique_component_indices],
-            'inter_bvs_per_unit_area': [self.inter_bvs_per_interface / self.component_dimensions.get(idx, dict()).get('S', np.nan)
-                                        for idx in self.unique_component_indices],
             'geometric_layer_thickness': [self.component_dimensions.get(idx, dict()).get('geometric_layer_thickness', np.nan)
                                           for idx in self.unique_component_indices],
             'physical_layer_thickness': [self.component_dimensions.get(idx, dict()).get('physical_layer_thickness', np.nan)
@@ -603,14 +716,19 @@ class CrystalSubstructureSearcherResults:
             'BVS_x_periodicity': self.BVS_x_periodicity,
             'xbvs': self.xbvs,
             'mean_inter_bv': self.mean_inter_bv,
+            'mean_A_weighted_inter_bv': self.contact_A_weighted_inter_bv,
             'inter_bvs_per_interface': self.inter_bvs_per_interface,
+            'inter_bvs_per_unit_area': [
+                self.inter_bvs_per_interface / self.component_dimensions.get(idx, dict()).get('S', np.nan)
+                for idx in self.unique_component_indices],
 
-            'interfragment_contact_atoms': '|'.join(sorted(self.intercomponent_contact_atoms.keys())),
-            'interfragment_contact_atoms_full': str(self.intercomponent_contact_atoms),
-            'interfragment_contact_arbitrary_types': '|'.join(sorted(self.intercomponent_contact_atoms_groups.keys())),
-            'interfragment_contact_arbitrary_types_full': str(self.intercomponent_contact_atoms_groups),
-            'inter_contacts_bv_ML_estimated_(unreliable_share)': self.inter_contacts_bv_estimate.get('ML_estimated (confidence: False)', 0.0),
-            'inter_contacts_bv_estimate_methods': str(self.inter_contacts_bv_estimate),
+            'inter_contact_atoms': '|'.join(sorted(self.intercomponent_contact_atoms.keys())),
+            'inter_contact_atoms_area': self.intercomponent_contacts_area,
+            'inter_contact_atoms_count': self.intercomponent_contact_atoms,
+            'inter_contact_arbitrary_types_count': self.intercomponent_contact_atoms_groups,
+            'inter_contact_arbitrary_types': '|'.join(sorted(self.intercomponent_contact_atoms_groups.keys())),
+            'inter_contacts_bv_ML_estimated_(unreliable_share)': self.intercomponent_contacts_bv_estimate.get('ML_estimated (confidence: False)', 0.0),
+            'intercomponent_contact_midpoint_WP': self.intercomponent_contact_midpoint_WP,
 
             'suspicious_contacts': '|'.join(sorted(self.suspicious_contacts)),
         }

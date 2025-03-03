@@ -1,5 +1,5 @@
 import itertools
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 import copy
 from pathlib import Path
 from collections import defaultdict
@@ -14,7 +14,7 @@ from pymatgen.analysis.dimensionality import get_dimensionality_larsen, get_stru
 
 from element_data import ALLRED_ROCHOW_EN_DICT, CORDERO_COVALENT_RADIUS_DICT, ALVAREZ_VDW_RADIUS_DICT
 import utils
-from structure_classes import Substructure, CrystalSubstructures, TargetSubstructure
+from structure_classes import Substructure, CrystalSubstructures, TargetSubstructure, Contact
 
 from time import time
 from line_profiler_pycharm import profile
@@ -82,6 +82,7 @@ class CrystalSubstructureSearcher:
         self._substructure_periodicities = set()  # Tracks encountered substructure periodicities
         self._ltm_is_identified = False  # Flag for lattice transformation matrix identification
         self._ltm = None  # Stores lattice transformation matrix
+        self._intercomponent_contacts_in_original_cell: Union[None, List[Contact]] = None
 
         # Creates an initial structure graph without lattice transformation
         self._create_structure_graph(transform_lattice=False)
@@ -101,6 +102,14 @@ class CrystalSubstructureSearcher:
         - Uses SpacegroupAnalyzer to determine the conventional standard structure.
         - Returns the conventional structure for further analysis.
         """
+        read_in_structure = Structure.from_file(file_name, primitive=False)
+        print(
+            f"Read-in structure\n"
+            f"space_group: {read_in_structure.get_space_group_info()[0]}\n"
+            f"cell a_b_c: {read_in_structure.lattice.abc}\n"
+            f"cell alpha_beta_gamma: {read_in_structure.lattice.angles}\n"
+        )
+
         # Read the primitive cell from the CIF file
         primitive_structure = Structure.from_file(file_name, primitive=True)
 
@@ -109,7 +118,16 @@ class CrystalSubstructureSearcher:
         conventional_structure = sga.get_conventional_standard_structure()
 
         new_space_group = sga.get_space_group_symbol()  # Space group of the conventional structure
+        new_space_group_number = sga.get_space_group_number()
         # TODO: Add comparison between primitive and conventional structures, and notify if they differ
+        print(
+            f"Standardised structure\n"
+            f"new_space_group: {new_space_group}\n"
+            f"cell a_b_c: {conventional_structure.lattice.abc}\n"
+            f"cell alpha_beta_gamma: {conventional_structure.lattice.angles}\n"
+        )
+
+        self._new_space_group_number = new_space_group_number
 
         return conventional_structure
 
@@ -213,7 +231,7 @@ class CrystalSubstructureSearcher:
             print(f'Total sites after 2nd transformation: {self.structure.num_sites}')
 
         # Initialize an empty StructureGraph instance
-        self.sg = StructureGraph.with_empty_graph(self.structure, name=f"{self.crystal_graph_name}_CRYSTAL_GRAPH")
+        self.sg = StructureGraph.with_empty_graph(self.structure, name=f"CRYSTAL_GRAPH_{self.crystal_graph_name}")
 
         # Iterate over each site and compute its neighbors using VoronoiNN
         for site_idx, site_neighbors in enumerate(self._connectivity_calculator.get_all_nn_info(self.structure)):
@@ -297,6 +315,35 @@ class CrystalSubstructureSearcher:
 
         return unique_weights
 
+    def _check_plane_crossing(self, target_substructure_sg, verbose=False) -> None:
+
+        _2p_substructures_orientations = set()
+        for i, component in enumerate(
+                get_structure_components(target_substructure_sg, inc_orientation=True, inc_site_ids=True)
+        ):
+            periodicity = component['dimensionality']
+            orientation = component['orientation'] if component['orientation'] is not None else '_'
+            composition = component['structure_graph'].structure.composition.formula.replace(" ", "")
+            fragment_sites = component['site_ids']
+            if verbose:
+                print(f'TARGET SUBSTRUCTURE {periodicity}-p, component {i}: {orientation}, {composition}, {fragment_sites}')
+
+            if periodicity == 2:
+                _2p_substructures_orientations.add(orientation)
+
+        if len(_2p_substructures_orientations) == 1:
+            pass
+        else:
+            # if otherwise there several layers we must check if they cross
+            for h1k1l1, h2k2l2 in itertools.combinations(_2p_substructures_orientations, 2):
+                zone_axis = utils.get_zone_axis(h1k1l1, h2k2l2)
+                if zone_axis is not None:
+                    raise utils.IntersectingLayeredSubstructuresFound(
+                        f"layers in planes {h1k1l1} and {h2k2l2} intersect along {zone_axis}"
+                    )
+
+        return None
+
     def _restore_intra_contacts1(self, low_periodic_substructures: List[Dict]) -> defaultdict[int, List[Substructure]]:
         """
         Restores intra contacts that were previously removed while reducing periodicity.
@@ -371,6 +418,32 @@ class CrystalSubstructureSearcher:
                     test_graph_1 = test_graph_1 # Reject if periodicity increases
 
             low_p_substructure['sg'] = test_graph_1
+            inter_contacts = self.sg.diff(test_graph_1)['self']
+
+
+            # here we get the info on the inter contacts in the !!! original cell !!! of the structure
+            # to calculate some descriptors using original lattice
+            WPs_dict = utils.get_wyckoffs_dict(self._new_space_group_number)  # get dict with WPs
+            if get_dimensionality_larsen(test_graph_1) == self.target_periodicity:
+
+                intercomponent_contacts = []
+                for contact_type, contacts_list in low_p_substructure['deleted_contacts'].items():
+                    for contact in contacts_list:
+                        if contact[0] in inter_contacts:
+
+                            intercomponent_contacts.append(
+                                Contact.from_data(
+                                    pmg_structure=self.sg.structure,
+                                    at1_idx=contact[0][0],
+                                    at2_idx=contact[0][1],
+                                    t=contact[0][2],
+                                    contact_characteristics=contact[1],
+                                    element_grouping_dict=None,
+                                    WPs_dict=WPs_dict,
+                                )
+                            )
+                self._intercomponent_contacts_in_original_cell = intercomponent_contacts
+
 
             # Ensure periodicity is preserved after restoration
             if get_dimensionality_larsen(low_p_substructure['sg']) != low_p_substructure['max_periodicity']:
@@ -390,7 +463,7 @@ class CrystalSubstructureSearcher:
                     max_periodicity=low_p_substructure['max_periodicity'],
                     sg=low_p_substructure['sg'],
                     deleted_contacts=low_p_substructure['deleted_contacts'],
-                    inter_contacts=self.sg.diff(low_p_substructure['sg'])['self'],
+                    inter_contacts=inter_contacts,
                     BVS=self._calculate_SG_BV_sum(low_p_substructure['sg'])
                 )
             )
@@ -401,7 +474,7 @@ class CrystalSubstructureSearcher:
 
         return substructures
 
-    def _restore_intra_contacts2(self, target_substructure: Dict) -> Union[None, TargetSubstructure]:
+    def _restore_intra_contacts2(self, target_substructure: Dict) -> Optional[TargetSubstructure]:
         """
         Restores intra contacts for the target substructure while ensuring periodicity does not increase.
 
@@ -429,29 +502,7 @@ class CrystalSubstructureSearcher:
         tic = time()
 
         # first check if there are no crossing 2-p substructures (like in CoU6 ICSD 108323)
-        _2p_substructures_orientations = set()
-        for i, component in enumerate(
-                get_structure_components(target_substructure['sg'], inc_orientation=True, inc_site_ids=True)
-        ):
-            periodicity = component['dimensionality']
-            orientation = component['orientation'] if component['orientation'] is not None else '_'
-            composition = component['structure_graph'].structure.composition.formula.replace(" ", "")
-            fragment_sites = component['site_ids']
-            print(f'TARGET SUBSTRUCTURE {periodicity}-p, component {i+1}: {orientation}, {composition}, {fragment_sites}')
-
-            if periodicity == 2:
-                _2p_substructures_orientations.add(orientation)
-
-        if len(_2p_substructures_orientations) == 1:
-            pass
-        else:
-            # if otherwise there several layers we must check if they cross
-            for h1k1l1, h2k2l2 in itertools.combinations(_2p_substructures_orientations, 2):
-                zone_axis = utils.get_zone_axis(h1k1l1, h2k2l2)
-                if zone_axis is not None:
-                    raise utils.IntersectingLayeredSubstructuresFound(
-                        f"layers in planes {h1k1l1} and {h2k2l2} intersect along {zone_axis}"
-                    )
+        self._check_plane_crossing(target_substructure['sg'])
 
         test_graph_1 = copy.copy(target_substructure['sg'])
 
@@ -480,6 +531,9 @@ class CrystalSubstructureSearcher:
 
         target_substructure['sg'] = test_graph_1
 
+        # check again if there are no crossing 2-p substructures (like in CoU6 ICSD 108323)
+        self._check_plane_crossing(target_substructure['sg'], verbose=True)
+
         # Ensure periodicity is preserved after restoration
         if get_dimensionality_larsen(target_substructure['sg']) != self.target_periodicity:
             raise utils.IntraContactsRestorationError(
@@ -503,6 +557,7 @@ class CrystalSubstructureSearcher:
             sg=target_substructure['sg'],
             deleted_contacts=target_substructure['deleted_contacts'],
             inter_contacts=self.sg.diff(target_substructure['sg'])['self'],
+            intercomponent_contacts_in_original_cell=self._intercomponent_contacts_in_original_cell,
             BVS=self._calculate_SG_BV_sum(target_substructure['sg']),
             total_BVS=target_substructure['total_BVS'],
             ltm_used=self._ltm,
@@ -575,7 +630,7 @@ class CrystalSubstructureSearcher:
 
         return None
 
-    def _analyze_graph1(self) -> Union[None, defaultdict]:
+    def _analyze_graph1(self) -> Optional[defaultdict]:
         """
         Iteratively edits the crystal graph by removing edges based on threshold weights
         until reaching 0-periodic substructures.
@@ -659,7 +714,7 @@ class CrystalSubstructureSearcher:
 
         return restored_crystal_substructures
 
-    def _analyze_graph2(self) -> Union[None, TargetSubstructure]:
+    def _analyze_graph2(self) -> Optional[TargetSubstructure]:
         """
         Iteratively edits the crystal graph by removing edges based on threshold weights
         until reaching the target periodicity.
