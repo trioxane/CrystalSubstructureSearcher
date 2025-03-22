@@ -35,8 +35,12 @@ def main():
 
     run_results = []
 
-    for f in glob.glob(r'C:/Users/pavel.zolotarev/Desktop/icsd_BVS/binding_energies_all/*_form2.cif'):
+    for i, f in enumerate(glob.glob(r'C:/Users/pavel.zolotarev/Desktop/icsd_BVS/binding_energies_all/*.cif')):
+    # for f in glob.glob(r'C:/Users/pavel.zolotarev/Desktop/icsd_BVS/binding_energies_all/*_form2.cif'):
     # for i, f in enumerate(list(glob.glob(r'C:/Users/pavel.zolotarev/Desktop/icsd_BVS/binding_energies_all/*.cif'))):
+
+        if i == 200:
+            break
 
         filename = Path(f).stem
         print(f'Start analysis: {filename}')
@@ -53,7 +57,7 @@ def main():
 
             crystal_substructures.save_substructure_components(
                 save_components_path='./test_save_cif',
-                save_as_cif=True,
+                save_substructure_as_cif=True,
                 save_bulk_as_cif=False,
                 store_symmetrized_cell=True,
                 vacuum_space=20.0,

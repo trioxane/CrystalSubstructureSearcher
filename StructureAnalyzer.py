@@ -12,8 +12,8 @@ from pymatgen.analysis.graphs import StructureGraph
 from pymatgen.analysis.local_env import VoronoiNN
 from pymatgen.analysis.dimensionality import get_dimensionality_larsen, get_structure_components
 
-from element_data import ALLRED_ROCHOW_EN_DICT, CORDERO_COVALENT_RADIUS_DICT, ALVAREZ_VDW_RADIUS_DICT
 import utils
+from element_data import ALLRED_ROCHOW_EN_DICT, CORDERO_COVALENT_RADIUS_DICT, ALVAREZ_VDW_RADIUS_DICT
 from structure_classes import Substructure, CrystalSubstructures, TargetSubstructure, Contact
 
 from time import time
@@ -81,10 +81,11 @@ class CrystalSubstructureSearcher:
         self._substructure_periodicities = set()  # Tracks encountered substructure periodicities
         self._ltm_is_identified = False  # Flag for lattice transformation matrix identification
         self._ltm = None  # Stores lattice transformation matrix
-        self._intercomponent_contacts_in_original_cell: Union[None, List[Contact]] = None
+        self._intercomponent_contacts_in_original_cell: Optional[List[Contact]] = None
+        self._atom_valences: Optional[defaultdict] = None  # store atom valences
 
         # Creates an initial structure graph without lattice transformation
-        self._create_structure_graph(transform_lattice=False)
+        self._create_structure_graph(transform_lattice=False, calculate_valences=False)
 
     def _read_in_structure(self, file_name: str) -> Structure:
         """
@@ -130,8 +131,8 @@ class CrystalSubstructureSearcher:
 
         return conventional_structure
 
-    def _add_weight_to_graph_edges(self, site_idx: int, neighbor_data: Dict,
-                                   suspicious_BV_threshold: float = 8.0) -> None:
+    def _add_weight_to_graph_edges(self, site_idx: int, neighbor_data: Dict, calculate_valences: bool,
+                                   suspicious_BV_threshold: float = 5.0) -> None:
         """
         Adds an edge weight (A, R, SA, PI, BV) to the crystal graph based on VoronoiNN calculations.
         Article on PI: https://pubs.rsc.org/en/content/articlehtml/2023/sc/d3sc02238b
@@ -139,7 +140,8 @@ class CrystalSubstructureSearcher:
         Args:
             site_idx (int): Index of the central site in the structure.
             neighbor_data (Dict): Information about the neighboring site, including polyhedral properties.
-            suspicious_BV_threshold (float, optional): Threshold above which bond valence (BV) is considered suspicious.
+            suspicious_BV_threshold (float, optional): Threshold above which bond is considered suspicious
+                (set as max quintuple bond Cr-Cr/Mo-Mo).
 
         The method performs the following steps:
         - Extracts atomic symbols of the central and neighboring atoms.
@@ -147,6 +149,7 @@ class CrystalSubstructureSearcher:
         - Makes bond valence (BV) calculations and checks if the value is suspiciously high.
         - Adds an edge to the structure graph with the selected bond property as the weight.
         """
+
         # Extract atomic symbols
         central_atom = self.structure[site_idx].specie.symbol
         neighbour_atom = neighbor_data['site'].specie.symbol
@@ -183,7 +186,10 @@ class CrystalSubstructureSearcher:
             warn_duplicates=False,
         )
 
-    def _create_structure_graph(self, transform_lattice: bool = False) -> None:
+        if calculate_valences:
+            self._atom_valences[site_idx] += BV
+
+    def _create_structure_graph(self, transform_lattice: bool = False, calculate_valences: bool = False) -> None:
         """
         Creates a StructureGraph instance from the Structure by calculating connectivity
         and adding attributes to the crystal structure graph edges.
@@ -201,6 +207,9 @@ class CrystalSubstructureSearcher:
         Raises:
             utils.BulkConnectivityCalculationError: If the graph periodicity is found to be less than 3.
         """
+
+        if calculate_valences:
+            self._atom_valences = defaultdict(float)  # dict with valences of atoms in the structure
 
         # Apply lattice transformation if requested and identified
         if transform_lattice:
@@ -235,13 +244,15 @@ class CrystalSubstructureSearcher:
         # Iterate over each site and compute its neighbors using VoronoiNN
         for site_idx, site_neighbors in enumerate(self._connectivity_calculator.get_all_nn_info(self.structure)):
             for site_neighbor in site_neighbors:
-                self._add_weight_to_graph_edges(site_idx, site_neighbor)
+                self._add_weight_to_graph_edges(site_idx, site_neighbor, calculate_valences=calculate_valences)
 
         # Add element properties to graph nodes
         for i, node in enumerate(self.sg.graph.nodes):
             node_element_symbol = self.sg.structure[i].specie.symbol
             self.sg.graph.nodes[i]['element'] = node_element_symbol
             self.sg.graph.nodes[i]['EN'] = round(ALLRED_ROCHOW_EN_DICT[node_element_symbol], 6)
+            if calculate_valences:
+                self.sg.graph.nodes[i]['valence'] = round(self._atom_valences[i], 2)
 
         # Check if the periodicity of the structure graph is valid
         structure_graph_periodicity = get_dimensionality_larsen(self.sg)
@@ -798,7 +809,7 @@ class CrystalSubstructureSearcher:
         restored_crystal_substructures = self._analyze_graph1()
 
         # Step 2: Create a new structure graph using the identified lattice transformation
-        self._create_structure_graph(transform_lattice=True)
+        self._create_structure_graph(transform_lattice=True, calculate_valences=True)
 
         # Step 3: Run the second graph analysis to extract the target substructure
         restored_target_crystal_substructure = self._analyze_graph2()

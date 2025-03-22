@@ -13,7 +13,7 @@ from pymatgen.analysis.dimensionality import get_structure_components
 
 
 import utils
-from element_data import get_element_grouping_dict, ALVAREZ_VDW_RADIUS_DICT
+from element_data import get_element_grouping_dict, ALVAREZ_VDW_RADIUS_DICT, MAX_VALENCE_DICT
 
 
 class Contact:
@@ -68,7 +68,7 @@ class Contact:
         if WPs_dict is not None:
             # worse algo
             # self.contact_midpoint_WP: str = utils.get_wyckoff_position_from_xyz(WPs_dict, contact_midpoint)
-            # bit better one, still not ideal and makes errors
+            # a bit better one, still not ideal and makes errors
             self.contact_midpoint_WP: str = utils.determine_wyckoff_position(contact_midpoint, struct=pmg_structure)
         else:
             self.contact_midpoint_WP = ''
@@ -106,6 +106,7 @@ class Substructure:
 
 
 class TargetSubstructure(Substructure):
+
     def __init__(
             self,
             max_periodicity: int,
@@ -162,7 +163,7 @@ class TargetSubstructure(Substructure):
         Returns:
             list: Indices of the last occurrence of each unique graph.
         """
-        # TODO check maybe store last appearances not the first ones
+        # DONE check maybe store last appearances not the first ones
         # check graphs isomorphism by comparing node elements and edge distances
         node_matcher = nx.algorithms.isomorphism.categorical_node_match(attr='element', default='')
         edge_matcher = nx.algorithms.isomorphism.numerical_multiedge_match(attr='R', default=1.0, atol=1e-1)
@@ -268,6 +269,7 @@ class CrystalSubstructures:
 
         self._ltm_applied = css_instance._ltm
 
+        self.atom_data = css_instance.sg.graph.nodes(data=True)
         self._BVS_x_periodicity: Optional[Dict] = None
         self._BVS_x_periodicity_normalized: Optional[Dict] = None
 
@@ -331,7 +333,7 @@ class CrystalSubstructures:
     def save_substructure_components(
             self,
             save_components_path: str = './',
-            save_as_cif: bool = True,
+            save_substructure_as_cif: bool = True,
             save_bulk_as_cif: bool = False,
             store_symmetrized_cell: bool = False,
             vacuum_space: float = 20.0,
@@ -451,7 +453,7 @@ class CrystalSubstructures:
                         else:
                             component_structure = component_sg.structure
 
-                        if save_as_cif:
+                        if save_substructure_as_cif:
                             component_structure.to(save_path, fmt='cif')
 
                     # otherwise we need to first put the layer inside
@@ -477,7 +479,7 @@ class CrystalSubstructures:
 
                                 restoration_succeeded = True
 
-                                if save_as_cif:
+                                if save_substructure_as_cif:
                                     component_structure.to(save_path, fmt='cif')
 
                         if not restoration_succeeded:
@@ -487,7 +489,7 @@ class CrystalSubstructures:
                         'S': S,
                         'geometric_layer_thickness': geometric_layer_thickness,
                         'physical_layer_thickness': physical_layer_thickness,
-                        'save_path': str(save_path.absolute()) if save_as_cif else '',
+                        'save_path': str(save_path.absolute()) if save_substructure_as_cif else '',
                     }
 
 
@@ -522,7 +524,7 @@ class CrystalSubstructureSearcherResults:
             self,
             crystal_substructures: CrystalSubstructures,
             element_grouping: Union[int, Dict] = 1,
-    ) -> None:
+    ):
         """
         Initialize the CrystalSubstructureSearcherResults.
 
@@ -537,6 +539,8 @@ class CrystalSubstructureSearcherResults:
 
         self.BVS_x_periodicity = crystal_substructures._BVS_x_periodicity
         self.BVS_x_periodicity_normalized = crystal_substructures._BVS_x_periodicity_normalized
+
+        self._calculate_atom_valence_data(crystal_substructures.atom_data)
 
         if crystal_substructures.target_substructure is not None:
 
@@ -612,6 +616,32 @@ class CrystalSubstructureSearcherResults:
             return tuple(np.linalg.inv(self.ltm_used).dot(transformed_cell_orientation).astype(int))
         else:
             return ''
+
+    def _calculate_atom_valence_data(self, node_view: nx.Graph.nodes) -> None:
+        """
+        Calculate attributes related to the atom valences in the structure.
+
+        atom_valences (Dict): dictionary with keys element symbols
+            and values the set of unique valences for the element in the crystal structure
+        suspicious_valences (Set): set storing the strings with element, site_index and atom valence information
+
+        Args:
+            node_view: data for nodes of the structure graph
+        """
+
+        atom_valences = defaultdict(set)
+        suspicious_valences = set()
+
+        for i, n in node_view:
+            element, valence = n['element'], n['valence']
+            if valence > MAX_VALENCE_DICT[element]:
+                suspicious_valences.add(f'{element}{i} {valence:.1f} vu')
+            atom_valences[element].add(valence)
+
+        self.atom_valences = {k: sorted(v) for k, v in atom_valences.items()}
+        self.suspicious_valences = suspicious_valences
+
+        return None
 
     def _calculate_additional_results(self) -> None:
 
@@ -720,8 +750,8 @@ class CrystalSubstructureSearcherResults:
             'inter_bvs_per_interface': self.inter_bvs_per_interface,
             'inter_bvs_per_unit_area': [
                 self.inter_bvs_per_interface / self.component_dimensions.get(idx, dict()).get('S', np.nan)
-                for idx in self.unique_component_indices],
-
+                for idx in self.unique_component_indices
+            ],
             'inter_contact_atoms': '|'.join(sorted(self.intercomponent_contact_atoms.keys())),
             'inter_contact_atoms_area': self.intercomponent_contacts_area,
             'inter_contact_atoms_count': self.intercomponent_contact_atoms,
@@ -730,7 +760,9 @@ class CrystalSubstructureSearcherResults:
             'inter_contacts_bv_ML_estimated_(unreliable_share)': self.intercomponent_contacts_bv_estimate.get('ML_estimated (confidence: False)', 0.0),
             'intercomponent_contact_midpoint_WP': self.intercomponent_contact_midpoint_WP,
 
-            'suspicious_contacts': '|'.join(sorted(self.suspicious_contacts)),
+            'suspicious_contacts': sorted(self.suspicious_contacts),
+            'suspicious_valences': sorted(self.suspicious_valences),
+            'atom_valences': self.atom_valences,
         }
 
         results.update(self.BVS_x_periodicity_normalized)

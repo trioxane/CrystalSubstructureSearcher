@@ -16,7 +16,7 @@ from pymatgen.core.sites import PeriodicSite
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
 WYCKOFF_CSV_PATH = "./wyckoff_list.csv"  # csv file with WPs data
-BV_PARAMETERS_EXCEL_TABLE_PATH = "./BV_estimated_23-04-2024.xlsx"  # excel file with BV parameters
+BV_PARAMETERS_EXCEL_TABLE_PATH = "./BV_estimated_23-04-2024.xlsx"  # Excel file with BV parameters
 
 
 class StructureGraphAnalysisException(Exception):
@@ -294,7 +294,7 @@ def calculate_ltm_for_uvw(target_uvw, initial_lattice_vectors, N=2) -> Tuple[np.
         gamma = np.rad2deg(np.arccos(np.clip(np.dot(candidate, a_new_norm) / np.linalg.norm(candidate), -1, 1)))
 
         # Ensure the candidate is approximately perpendicular to both
-        # if 60 < abs(alpha) < 120 and 60 < abs(gamma) < 120: TODO think about selection criteria
+        # TODO think about selection criteria
         if 75 < abs(alpha) < 120 and 75 < abs(gamma) < 120:
             b_new_candidates.append(((n1, n2, n3), candidate, np.linalg.norm(candidate)))
 
