@@ -366,70 +366,6 @@ def get_zone_axis(h1k1l1: Sequence, h2k2l2: Sequence) -> Union[None, np.ndarray]
     return zone_axis
 
 
-def get_wyckoffs_dict(space_group_number: int) -> Dict:
-    """
-    Loads Wyckoff positions for a given space group number from a CSV file.
-
-    Args:
-        space_group_number (int): The international space group number.
-
-    Returns:
-        dict: A dict of Wyckoff positions, containing a list of SymmOp operations.
-    """
-
-    # Load Wyckoff position data from CSV
-    df = pd.read_csv(WYCKOFF_CSV_PATH, index_col=0)
-
-    # Extract the Wyckoff positions for the given space group number
-    wyckoff_strings = literal_eval(df.loc[space_group_number, "0"])  # Convert string to list
-
-    wyckoffs = []
-    for wp_group in wyckoff_strings:
-        wyckoff_ops = [SymmOp.from_xyz_string(op) for op in wp_group]
-        wyckoffs.append(wyckoff_ops)
-
-    length = len(wyckoffs)
-    wyckoffs_dict = {}
-    for i in range(len(wyckoffs)):
-        mult = len(wyckoffs[i])
-        letter = LETTERS[length - 1 - i]
-        wyckoffs_dict[f"{mult}{letter}"] = wyckoffs[i]
-
-    # reverse dict
-    wyckoffs_dict = {k: v for k, v in list(wyckoffs_dict.items())[::-1]}
-
-    return wyckoffs_dict
-
-
-def get_wyckoff_position_from_xyz(wyckoffs_dict: Dict, xyz: Sequence, decimals: int = 4) -> str:
-    """
-    Determines the Wyckoff position of a given fractional coordinate.
-
-    Args:
-        wyckoffs_dict (int): Dictionary with WPs for a given Space Group.
-        xyz (tuple or np.ndarray): Fractional coordinate [x, y, z].
-        decimals (int): Number of decimals for rounding.
-
-    Returns:
-        list: The Wyckoff position (list of SymmOp) if found, otherwise None.
-    """
-    xyz = np.round(np.array(xyz, dtype=float), decimals=decimals)
-    xyz -= np.floor(xyz)
-    # Iterate over Wyckoff positions and check if the point belongs
-    for letter, wp_ops in wyckoffs_dict.items():
-        # Apply all symmetry operations in the Wyckoff position to xyz
-        orbit = np.array([op.operate(xyz) for op in wp_ops])
-        orbit -= np.floor(orbit)
-
-        # Check if the transformed points match the original point
-        if np.any(np.all(np.isclose(orbit, xyz, atol=1e-4), axis=1)):
-            # Ensure all transformed points are unique
-            if len(orbit) == len(np.unique(orbit.round(decimals=decimals), axis=0)):
-                return letter  # Return the matching Wyckoff position letter
-    return '--'
-    # raise RuntimeError(f"Cannot find the suitable Wyckoff position for the given input position {xyz}")
-
-
 def determine_wyckoff_position(
     frac_coords: Tuple[float, float, float], struct: Structure, symprec=0.01, dist_tol=0.01
 ) -> str:
@@ -485,6 +421,7 @@ def determine_wyckoff_position(
         conv_cell_factor = len(symm_dataset["std_positions"]) / len(symm_dataset["wyckoffs"])
         multiplicity = int(conv_cell_factor * len(unique_sites))
         wyckoff_label = f"{multiplicity}{symm_dataset['wyckoffs'][-1]}"
+
     except Exception as e:
         print(e.__class__.__name__)
         wyckoff_label = '--'

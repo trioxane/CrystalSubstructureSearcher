@@ -26,17 +26,17 @@ class Contact:
             t: Tuple,
             contact_characteristics: Dict,
             element_grouping_dict: Optional[Dict] = None,
-            WPs_dict: Optional[Dict] = None,
+            identify_WP: bool = False,
     ):
 
         self.t: Tuple = t
         self.at1_idx: int = at1_idx
         self.at2_idx: int = at2_idx
 
-        self._fill_attributes(pmg_structure, contact_characteristics, element_grouping_dict, WPs_dict)
+        self._fill_attributes(pmg_structure, contact_characteristics, element_grouping_dict, identify_WP)
 
     def _fill_attributes(
-            self, pmg_structure: Structure, contact_characteristics: Dict, element_grouping_dict: Dict, WPs_dict: Dict
+            self, pmg_structure: Structure, contact_characteristics: Dict, element_grouping_dict: Dict, identify_WP: bool
     ) -> None:
 
         self.at1: str = pmg_structure[self.at1_idx].specie.symbol
@@ -65,17 +65,14 @@ class Contact:
         # print(contact_midpoint)
         self.contact_midpoint: np.ndarray = np.round(np.mod(contact_midpoint, 1.0), decimals=4)
 
-        if WPs_dict is not None:
-            # worse algo
-            # self.contact_midpoint_WP: str = utils.get_wyckoff_position_from_xyz(WPs_dict, contact_midpoint)
-            # a bit better one, still not ideal and makes errors
+        if identify_WP:
             self.contact_midpoint_WP: str = utils.determine_wyckoff_position(contact_midpoint, struct=pmg_structure)
         else:
             self.contact_midpoint_WP = ''
 
     @classmethod
-    def from_data(cls, pmg_structure, at1_idx, at2_idx, t, contact_characteristics, element_grouping_dict, WPs_dict):
-        return cls(pmg_structure, at1_idx, at2_idx, t, contact_characteristics, element_grouping_dict, WPs_dict)
+    def from_data(cls, pmg_structure, at1_idx, at2_idx, t, contact_characteristics, element_grouping_dict, identify_WP):
+        return cls(pmg_structure, at1_idx, at2_idx, t, contact_characteristics, element_grouping_dict, identify_WP)
 
 
 class Substructure:
@@ -184,22 +181,6 @@ class TargetSubstructure(Substructure):
                 unique_component_indices.append(i)
 
         unique_component_indices = sorted(unique_component_indices)
-
-        # unique_component_indices = []
-        # for i in range(len(self.component_graphs)):
-        #     is_unique = True
-        #     for j in range(len(self.component_graphs)):
-        #         if i > j:
-        #             if nx.is_isomorphic(
-        #                     self.component_graphs[i].graph,
-        #                     self.component_graphs[j].graph,
-        #                     node_match=node_matcher,
-        #                     edge_match=edge_matcher,
-        #             ):
-        #                 is_unique = False
-        #                 break
-        #     if is_unique:
-        #         unique_component_indices.append(i)
 
         print(f'unique_component_indices: {unique_component_indices}')
         self.unique_component_indices = unique_component_indices
@@ -632,8 +613,8 @@ class CrystalSubstructureSearcherResults:
         atom_valences = defaultdict(set)
         suspicious_valences = set()
 
-        for i, n in node_view:
-            element, valence = n['element'], n['valence']
+        for i, n_dict in node_view:
+            element, valence = n_dict['element'], n_dict['valence']
             if valence > MAX_VALENCE_DICT[element]:
                 suspicious_valences.add(f'{element}{i} {valence:.1f} vu')
             atom_valences[element].add(valence)
@@ -651,7 +632,7 @@ class CrystalSubstructureSearcherResults:
 
         # these data correspond to the transformed cell
         intercomponent_contacts = []
-        # dictionary self.deleted_contacts
+        # just a reminder that dictionary self.deleted_contacts is
         # ((at1_string, at2_string), BV_float): List[Tuple[Tuple[at1_idx_int, at2_idx_int, Tuple[translation]], Dict]
         for contact_type, contacts_list in self._deleted_contacts.items():
             for contact in contacts_list:
@@ -665,7 +646,7 @@ class CrystalSubstructureSearcherResults:
                             t=contact[0][2],
                             contact_characteristics=contact[1],
                             element_grouping_dict=self._element_grouping_dict,
-                            WPs_dict=None,
+                            identify_WP=False
                         )
                     )
 

@@ -80,7 +80,7 @@ class CrystalSubstructureSearcher:
         self.restored_crystal_substructures = None  # Stores restored substructures after graph editing
         self._substructure_periodicities = set()  # Tracks encountered substructure periodicities
         self._ltm_is_identified = False  # Flag for lattice transformation matrix identification
-        self._ltm = None  # Stores lattice transformation matrix
+        self._ltm = (1, 1, 1)  # Stores lattice transformation matrix
         self._intercomponent_contacts_in_original_cell: Optional[List[Contact]] = None
         self._atom_valences: Optional[defaultdict] = None  # store atom valences
 
@@ -216,27 +216,26 @@ class CrystalSubstructureSearcher:
 
             if not self._ltm_is_identified:
                 print(f'Lattice will NOT be transformed')
-                return None
+            else:
+                print(f'Lattice will be transformed')
+                print(f'Total sites before: {self.structure.num_sites}')
+                print('LTM:')
+                print(f'{self._ltm}')
 
-            print(f'Lattice will be transformed')
-            print(f'Total sites before: {self.structure.num_sites}')
-            print('LTM:')
-            print(f'{self._ltm}')
+                # Apply transformation to the structure
+                self.structure.make_supercell(self._ltm)
+                print(f'Total sites after 1st transformation: {self.structure.num_sites}')
 
-            # Apply transformation to the structure
-            self.structure.make_supercell(self._ltm)
-            print(f'Total sites after 1st transformation: {self.structure.num_sites}')
+                # Additional expansion depending on target periodicity
+                if self.target_periodicity == 2:
+                    self.structure.make_supercell((1, 1, 2))  # Expand along c direction
+                elif self.target_periodicity == 1:
+                    self.structure.make_supercell((2, 2, 1))  # Expand along a and b directions
+                elif self.target_periodicity == 0:
+                    self.structure.make_supercell((2, 2, 2))  # Expand in all three directions
 
-            # Additional expansion depending on target periodicity
-            if self.target_periodicity == 2:
-                self.structure.make_supercell((1, 1, 2))  # Expand along c direction
-            elif self.target_periodicity == 1:
-                self.structure.make_supercell((2, 2, 1))  # Expand along a and b directions
-            elif self.target_periodicity == 0:
-                self.structure.make_supercell((2, 2, 2))  # Expand in all three directions
-
-            print(f'Lattice was transformed')
-            print(f'Total sites after 2nd transformation: {self.structure.num_sites}')
+                print(f'Lattice was transformed')
+                print(f'Total sites after 2nd transformation: {self.structure.num_sites}')
 
         # Initialize an empty StructureGraph instance
         self.sg = StructureGraph.with_empty_graph(self.structure, name=f"CRYSTAL_GRAPH_{self.crystal_graph_name}")
@@ -279,7 +278,7 @@ class CrystalSubstructureSearcher:
         """
         return sum([edge_data[2] for edge_data in sg.graph.edges(data='BV')])
 
-    def _get_threshold_weights(self, merge_close_weights: bool = False) -> np.ndarray:
+    def _get_threshold_weights(self) -> np.ndarray:
         """
         Returns a sorted list of threshold values for graph editing by cutting edges
         with weights lower than the threshold.
@@ -316,12 +315,6 @@ class CrystalSubstructureSearcher:
         unique_weights = np.array(sorted(unique_weights, reverse=reverse))
         # add small delta for them to serve as thresholds
         unique_weights += delta
-
-        # merge too close weights
-        if merge_close_weights:
-            diff = np.ediff1d(unique_weights)
-            indices = np.where(np.abs(diff) < delta + 10**-decimals)
-            unique_weights = np.array([v for v in unique_weights if v not in unique_weights[indices]])
 
         return unique_weights
 
@@ -433,7 +426,6 @@ class CrystalSubstructureSearcher:
 
             # here we get the info on the inter contacts in the !!! original cell !!! of the structure
             # to calculate some descriptors using original lattice
-            WPs_dict = utils.get_wyckoffs_dict(self._new_space_group_number)  # get dict with WPs
             if get_dimensionality_larsen(test_graph_1) == self.target_periodicity:
 
                 intercomponent_contacts = []
@@ -449,7 +441,7 @@ class CrystalSubstructureSearcher:
                                     t=contact[0][2],
                                     contact_characteristics=contact[1],
                                     element_grouping_dict=None,
-                                    WPs_dict=WPs_dict,
+                                    identify_WP=True,
                                 )
                             )
                 self._intercomponent_contacts_in_original_cell = intercomponent_contacts
@@ -598,7 +590,6 @@ class CrystalSubstructureSearcher:
         if not self._substructure_periodicities or self.target_periodicity not in self._substructure_periodicities:
             print('!!! Target periodicity substructure is not found !!!')
             self._ltm_is_identified = False
-            self._ltm = (1, 1, 1)  # Identity transformation (no change)
             return None
 
         results = []
