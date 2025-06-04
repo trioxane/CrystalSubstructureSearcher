@@ -24,6 +24,17 @@ class StructureGraphAnalysisException(Exception):
     Error encountered during crystal graph analysis
     """
 
+class BulkConnectivityCalculationError(StructureGraphAnalysisException):
+    """
+    The initial crystal structure graph periodicity is less than 3
+    """
+
+
+class IntraContactsRestorationError(StructureGraphAnalysisException):
+    """
+    Fragment dimensionality is not preserved during intrafragment contacts restoration
+    """
+
 
 class WeirdStructureException(Exception):
     """
@@ -39,18 +50,6 @@ class IntersectingLayeredSubstructuresFound(WeirdStructureException):
 
 class SuperCellSearchError(WeirdStructureException):
     pass
-
-
-class BulkConnectivityCalculationError(StructureGraphAnalysisException):
-    """
-    The initial crystal structure graph periodicity is less than 3
-    """
-
-
-class IntraContactsRestorationError(StructureGraphAnalysisException):
-    """
-    Fragment dimensionality is not preserved during intrafragment contacts restoration
-    """
 
 
 try:
@@ -88,9 +87,9 @@ def calculate_BV(args: tuple[float, str, str]) -> tuple[float, str]:
         ((df_bvparams['Atom1'] == el1) & (df_bvparams['Atom2'] == el2)) |
         ((df_bvparams['Atom1'] == el2) & (df_bvparams['Atom2'] == el1))
     ]
-    
+
     if empirical_bvs.shape[0] == 0:
-        return np.nan, 'no_estimate'
+        raise WeirdStructureException(f"BV calculation is not possible for the contact {el1}..{el2}")
 
     if empirical_bvs['R0_empirical'].notna().bool():
         # use R0_empirical

@@ -311,6 +311,8 @@ class CrystalSubstructureSearcher:
             delta = -delta
 
         # Extract and sort unique bond property weights
+        # TypeError: '<=' not supported between instances of 'float' and 'NoneType'
+        # print([t for t in self.sg.graph.edges(data='weight') if t[2] is None])
         unique_weights = set(np.round(self.sg.weight_statistics['all_weights'], decimals=decimals))
         unique_weights = np.array(sorted(unique_weights, reverse=reverse))
         # add small delta for them to serve as thresholds

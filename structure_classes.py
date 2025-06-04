@@ -464,6 +464,8 @@ class CrystalSubstructures:
                                     component_structure.to(save_path, fmt='cif')
 
                         if not restoration_succeeded:
+                            # StructureGraphAnalysisException >>> pymatgen error
+                            # print(set([d[2] for d in component_sg.graph.edges(data='to_jimage')]))
                             raise utils.StructureGraphAnalysisException("pymatgen error")
 
                     self.target_substructure.component_dimensions[idx] = {
