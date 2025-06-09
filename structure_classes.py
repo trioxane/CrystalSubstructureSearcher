@@ -454,13 +454,14 @@ class CrystalSubstructures:
                     N_supercell_in_c = np.ceil(min_slab_thickness / self.target_substructure.sg.structure.lattice.c)
                     structure_multiplied = copy.copy(self.target_substructure.sg)
                     structure_multiplied = structure_multiplied * [1, 1, N_supercell_in_c*2]
-
                     # structure_multiplied.structure.to('structure_multiplied.cif')
 
-                    # for num_comp, component in enumerate(get_structure_components(structure_multiplied)):
-                    #     p, component_sg = component['dimensionality'], component['structure_graph']
-                    #     print('num_comp', num_comp, 'p', p, component_sg.structure.composition.formula.replace(" ", ""))
-                    #     print(component_sg.structure.frac_coords)
+                    assert len(get_structure_components(structure_multiplied)) % 2 == 0, 'ERRONEOUS SLAB CREATION RESULT'
+
+                    for num_comp, component in enumerate(get_structure_components(structure_multiplied)):
+                        p, component_sg = component['dimensionality'], component['structure_graph']
+                        print('num_comp', num_comp, 'p', p, component_sg.structure.composition.formula.replace(" ", ""))
+                        print(component_sg.structure.frac_coords)
 
                     slab_frac_extreme_points = [0.0, 0.0]
                     first_layer = True
@@ -555,7 +556,7 @@ class CrystalSubstructures:
                         if save_substructure_as_cif:
                             component_structure.to(save_path, fmt='cif')
 
-                    # otherwise we need to first put the layer inside
+                    # otherwise we need first to put the layer inside
                     else:
                         print('layer is divided by unit cell borders')
 
