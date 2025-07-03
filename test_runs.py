@@ -36,20 +36,25 @@ def main():
     run_results = []
 
     # for i, f in enumerate(glob.glob(r'C:/Users/pavel.zolotarev/Desktop/icsd_BVS/binding_energies_all/*.cif')):
-    for f in glob.glob('C://Users//pavel.zolotarev//Dropbox//2d//3_aricle_iteration_2//120meV_data//Optimized_3D_structure//*.cif'):
+    # for f in glob.glob('C://Users//pavel.zolotarev//Dropbox//2d//3_aricle_iteration_2//120meV_data//Optimized_3D_structure//*.cif'):
     # done = set([Path(f).stem.strip('_BMP.cif')
     #             for f
-    #             in glob.glob(r'C:\Users\pavel.zolotarev\PycharmProjects\StructAnalyzer\structures_w_BMPs\*.cif')])
+    #             in glob.glob(r'C:\Users\pavel.zolotarev\PycharmProjects\StructAnalyzer\OI_structures_w_BMPs\*.cif')])
     # accepted = set(pd.read_excel(
     #     r'C:\Users\pavel.zolotarev\Desktop\obstructed insulators\OWCCs_exposed_neutral_layers_w_cleavage_plane_coincide.xlsx'
     # )['crystal_graph_name'].values)
-    #
-    # for f in glob.glob('C://Users//pavel.zolotarev//Desktop//obstructed insulators//cifs//*.cif'):
+
+    # for i, f in enumerate(glob.glob('C://Users//pavel.zolotarev//Desktop//obstructed insulators//cifs//*.cif')):
+
+    for i, f in enumerate(glob.glob(r'C:/Users/pavel.zolotarev/Dropbox/2d/3_aricle_iteration_2/test_set_300/BE_data_ICSD_new_all/*.cif')):
 
         # if Path(f).stem.strip('.cif') not in accepted:
         #     print(f)
         #     print('ALREADY DONE or NOT IN ACCEPTED')
         #     continue
+
+        # if i == 10:
+        #     break
 
         filename = Path(f).stem
         print(f'Start analysis: {filename}')
@@ -88,13 +93,14 @@ def main():
         finally:
             result.update({'runtime_sec': round(time.time() - tic, 2)})
             run_results.append(result)
+            timestamp = datetime.today().strftime('%d-%m-%Y_%H-%M')
 
     pd.DataFrame(run_results)\
         .explode(column=['orientation_in_original_cell', 'composition', 'periodicity', 'estimated_charge',
                          'inter_bvs_per_unit_area', 'geometric_layer_thickness', 'physical_layer_thickness', 'save_path'])\
-        .to_excel(f"CSS_Results_{datetime.today().strftime('%d-%m-%Y_%H-%M')}.xlsx")
+        .to_excel(f"CSS_Results_{timestamp}.xlsx")
 
-    with open(f"CSS_Results_{datetime.today().strftime('%d-%m-%Y_%H-%M')}.json", "w") as out_json:
+    with open(f"CSS_Results_{timestamp}.json", "w") as out_json:
         json.dump(run_results, out_json, cls=utils.npEncoder)
 
 

@@ -1,0 +1,33 @@
+paths:
+  input_cif_files_folder: "./input_cifs"
+  save_low_p_components_path: "./low_p_components"
+  save_structure_with_bond_midpoints_path: "./cifs_with_BMPs"
+  save_slab_as_cif_path: "./slabs"
+
+
+connectivity_calculation_parameters:
+  # pymatgen VoronoiNN parameters
+  tol: 0.1
+  cutoff: 6.0
+  extra_nn_info: True
+  allow_pathological: True
+  compute_adj_neighbors: False
+
+
+structure_graph_analysis_parameters:
+  bond_property: "BV"  # BV, R, SA, A, PI
+  target_periodicity: 2
+
+
+save_options:
+  save_substructure_as_cif: True
+  save_structure_with_bond_midpoints: False
+  save_slab_as_cif: False
+  save_bulk_as_cif: False
+  store_symmetrized_cell: True
+  vacuum_space: 15.0
+  min_slab_thickness: 20.0
+
+
+element_grouping:
+  element_grouping_dict: 1
