@@ -176,7 +176,8 @@ class CrystalSubstructureSearcher:
 
         # Compute bond valence (BV) using utility function
         BV, BV_calc_method = utils.calculate_BV((R, central_atom, neighbour_atom))
-        BV = round(BV, 5)  # Round for consistency
+        BV = round(BV, 5) + 1e-6  # Round for consistency and add minuscule weight for stability
+        # ??? weight 0.0 for StructureGraph not acceptable ???
 
         # If BV is suspiciously high, add it to the suspicious contacts list
         if BV > suspicious_BV_threshold:
