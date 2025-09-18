@@ -37,7 +37,7 @@ def main():
             Path(folder_path).mkdir(parents=True, exist_ok=True)
 
     # === Timestamp for consistent naming ===
-    timestamp = datetime.today().strftime('%d-%m-%Y_%H-%M')
+    timestamp = datetime.today().strftime('%d-%m-%Y_%H-%M-%S')
 
     # === Connectivity calculator ===
     connectivity_calculator = VoronoiNN(

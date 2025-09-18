@@ -15,7 +15,6 @@ from pymatgen.core.sites import PeriodicSite
 
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
-WYCKOFF_CSV_PATH = "./wyckoff_list.csv"  # csv file with WPs data
 BV_PARAMETERS_EXCEL_TABLE_PATH = "./BV_estimated_23-04-2024.xlsx"  # Excel file with BV parameters
 
 
@@ -27,7 +26,7 @@ class StructureGraphAnalysisException(Exception):
 
 class WeirdStructureException(Exception):
     """
-    Raised when a weird structure is found, which the LowDimfinder cannot handle
+    Raised when a weird structure is found, which cannot be handled
     """
 
 
@@ -49,7 +48,7 @@ class BulkConnectivityCalculationError(StructureGraphAnalysisException):
 
 class IntraContactsRestorationError(StructureGraphAnalysisException):
     """
-    Fragment dimensionality is not preserved during intrafragment contacts restoration
+    Fragment dimensionality is not preserved during intracomponent contacts restoration
     """
 
 
@@ -90,7 +89,7 @@ def calculate_BV(args: tuple[float, str, str]) -> tuple[float, str]:
     ]
     
     if empirical_bvs.shape[0] == 0:
-        return np.nan, 'no_estimate'
+        raise WeirdStructureException(f"No BV parameters for the contact {el1}..{el2}")
 
     if empirical_bvs['R0_empirical'].notna().bool():
         # use R0_empirical

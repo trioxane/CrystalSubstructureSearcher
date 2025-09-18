@@ -237,7 +237,7 @@ class TargetSubstructure(Substructure):
 
         self.component_charges = {idx: round(chg, 4) for idx, chg in sorted(component_charges.items())}
 
-        print(f'component_charges: {self.component_charges}')
+        print(f'component_charges: {self.component_charges}\n')
 
         return None
 
@@ -294,11 +294,9 @@ class CrystalSubstructures:
         partition_abs = np.abs(np.ediff1d(list(self._BVS_x_periodicity.values())))
         partition_diff = np.ediff1d(list(self._BVS_x_periodicity.values()))
 
-        print('partition "abs"', partition_abs)
-        print('partition "diff"', partition_diff)
-
         # structures in which BVS N-p < BVS (N-1)-p are unusual and this partition is not defined for them
         if any(diff > 0 for diff in partition_diff):
+            print(f"(!!!) Structure peculiarity observed in BVS_x_periodicity (!!!)")
             self._BVS_x_periodicity_normalized = {'3-p': np.nan, '2-p': np.nan, '1-p': np.nan}
         else:
             self._BVS_x_periodicity_normalized = {
@@ -475,8 +473,8 @@ class CrystalSubstructures:
                     for num_comp, component in enumerate(structure_multiplied_components):
 
                         p, component_sg = component['dimensionality'], component['structure_graph']
-                        print('num_comp', num_comp, 'p', p, component_sg.structure.composition.formula.replace(" ", ""))
-                        print(component_sg.structure.frac_coords)
+                        # print('num_comp', num_comp, 'p', p, component_sg.structure.composition.formula.replace(" ", ""))
+                        # print(component_sg.structure.frac_coords)
                         frac_coord_thickness = component_sg.structure.frac_coords[:, 2].max() - component_sg.structure.frac_coords[:, 2].min()
                         # if layer is divided by cell ab plane, skip this layer
                         if frac_coord_thickness > 0.5:
