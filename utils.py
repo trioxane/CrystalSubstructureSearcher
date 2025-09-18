@@ -15,7 +15,6 @@ from pymatgen.core.sites import PeriodicSite
 
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
-WYCKOFF_CSV_PATH = "./wyckoff_list.csv"  # csv file with WPs data
 BV_PARAMETERS_EXCEL_TABLE_PATH = "./BV_estimated_23-04-2024.xlsx"  # Excel file with BV parameters
 
 
@@ -24,21 +23,10 @@ class StructureGraphAnalysisException(Exception):
     Error encountered during crystal graph analysis
     """
 
-class BulkConnectivityCalculationError(StructureGraphAnalysisException):
-    """
-    The initial crystal structure graph periodicity is less than 3
-    """
-
-
-class IntraContactsRestorationError(StructureGraphAnalysisException):
-    """
-    Fragment dimensionality is not preserved during intrafragment contacts restoration
-    """
-
 
 class WeirdStructureException(Exception):
     """
-    Raised when a weird structure is found, which the LowDimfinder cannot handle
+    Raised when a weird structure is found, which cannot be handled
     """
 
 
@@ -50,6 +38,18 @@ class IntersectingLayeredSubstructuresFound(WeirdStructureException):
 
 class SuperCellSearchError(WeirdStructureException):
     pass
+
+
+class BulkConnectivityCalculationError(StructureGraphAnalysisException):
+    """
+    The initial crystal structure graph periodicity is less than 3
+    """
+
+
+class IntraContactsRestorationError(StructureGraphAnalysisException):
+    """
+    Fragment dimensionality is not preserved during intracomponent contacts restoration
+    """
 
 
 try:
@@ -87,9 +87,9 @@ def calculate_BV(args: tuple[float, str, str]) -> tuple[float, str]:
         ((df_bvparams['Atom1'] == el1) & (df_bvparams['Atom2'] == el2)) |
         ((df_bvparams['Atom1'] == el2) & (df_bvparams['Atom2'] == el1))
     ]
-
+    
     if empirical_bvs.shape[0] == 0:
-        raise WeirdStructureException(f"BV calculation is not possible for the contact {el1}..{el2}")
+        raise WeirdStructureException(f"No BV parameters for the contact {el1}..{el2}")
 
     if empirical_bvs['R0_empirical'].notna().bool():
         # use R0_empirical

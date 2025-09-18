@@ -6,6 +6,8 @@ __pycache__/
 *.txt
 *.cif
 *.xlsx
+*.json
+*.csv
 
 # C extensions
 *.so

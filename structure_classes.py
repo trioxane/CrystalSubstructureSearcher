@@ -1,11 +1,13 @@
 from collections import defaultdict, Counter
 from typing import List, Dict, Union, Tuple, Set, Optional
 from pathlib import Path
+import copy
 
 import networkx as nx
 import pandas as pd
 import numpy as np
 
+from pymatgen.io.cif import CifWriter
 from pymatgen.core import Structure, Composition
 from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.graphs import StructureGraph
@@ -113,13 +115,15 @@ class TargetSubstructure(Substructure):
             intercomponent_contacts_in_original_cell: list[Contact],
             BVS: float,
             total_BVS: float,
-            ltm_used: np.ndarray,
+            ltm_used: tuple,
+            initial_cell: Structure,
     ):
 
         super().__init__(max_periodicity, sg, deleted_contacts, inter_contacts, BVS)
 
         self.total_BVS = total_BVS
         self.ltm_used = ltm_used
+        self.initial_cell = initial_cell
         self.intercomponent_contacts_in_original_cell = intercomponent_contacts_in_original_cell
 
         self.component_charges: Dict[int, float] = None
@@ -163,7 +167,7 @@ class TargetSubstructure(Substructure):
         # DONE check maybe store last appearances not the first ones
         # check graphs isomorphism by comparing node elements and edge distances
         node_matcher = nx.algorithms.isomorphism.categorical_node_match(attr='element', default='')
-        edge_matcher = nx.algorithms.isomorphism.numerical_multiedge_match(attr='R', default=1.0, atol=1e-1)
+        edge_matcher = nx.algorithms.isomorphism.numerical_multiedge_match(attr='R', default=1.0, atol=1e-2)
 
         unique_component_indices = []
         for i in range(len(self.component_graphs) - 1, -1, -1):  # Iterate in reverse
@@ -233,7 +237,7 @@ class TargetSubstructure(Substructure):
 
         self.component_charges = {idx: round(chg, 4) for idx, chg in sorted(component_charges.items())}
 
-        print(f'component_charges: {self.component_charges}')
+        print(f'component_charges: {self.component_charges}\n')
 
         return None
 
@@ -290,11 +294,9 @@ class CrystalSubstructures:
         partition_abs = np.abs(np.ediff1d(list(self._BVS_x_periodicity.values())))
         partition_diff = np.ediff1d(list(self._BVS_x_periodicity.values()))
 
-        print('partition "abs"', partition_abs)
-        print('partition "diff"', partition_diff)
-
         # structures in which BVS N-p < BVS (N-1)-p are unusual and this partition is not defined for them
         if any(diff > 0 for diff in partition_diff):
+            print(f"(!!!) Structure peculiarity observed in BVS_x_periodicity (!!!)")
             self._BVS_x_periodicity_normalized = {'3-p': np.nan, '2-p': np.nan, '1-p': np.nan}
         else:
             self._BVS_x_periodicity_normalized = {
@@ -315,18 +317,27 @@ class CrystalSubstructures:
             self,
             save_components_path: str = './',
             save_substructure_as_cif: bool = True,
+            save_structure_with_bond_midpoints: bool = False,
+            save_structure_with_bond_midpoints_path: str = './',
+            save_slab_as_cif: bool = False,
+            save_slab_as_cif_path: str = './',
+            min_slab_thickness: int = 20,
             save_bulk_as_cif: bool = False,
             store_symmetrized_cell: bool = False,
             vacuum_space: float = 20.0,
     ) -> None:
 
-        def _transform_layer_cell():
+        PMG_ERROR = False
 
+        def _transform_layer_cell(idx):
+
+            # TODO move this to the utils
             a_vec, b_vec, c_vec = component_sg.structure.lattice.matrix
 
             ab_normal = np.cross(a_vec, b_vec)
             ab_normal /= np.linalg.norm(ab_normal)
             new_lattice = [a_vec, b_vec, ab_normal * vacuum_space]
+            # TODO check this ab_normal * vacuum_space in case of thick layers
 
             layer_with_vacuum = Structure(
                 new_lattice,
@@ -335,7 +346,7 @@ class CrystalSubstructures:
                 site_properties=component_sg.structure.site_properties,
                 coords_are_cartesian=True,
             )
-            # layer_with_vacuum.to('check_layer_w_vacuum.cif')
+            # layer_with_vacuum.to(f'check_layer_w_vacuum_{idx}.cif')
 
             # get dimensions of the layer
             top_atom_idx = layer_with_vacuum.frac_coords[:, 2].argmax()
@@ -404,7 +415,119 @@ class CrystalSubstructures:
                     Path(save_components_path) / f"{self.crystal_graph_name}_bulk_transformed.cif", fmt='cif'
                 )
 
+            if save_structure_with_bond_midpoints:
+                unique_intercomponent_contact_midpoints = [
+                    (c.bond, round(c.R, 3), c.contact_midpoint_WP, c.contact_midpoint)
+                    for c in self.target_substructure.intercomponent_contacts_in_original_cell
+                ]
+
+                structure_w_BMP = self.target_substructure.initial_cell.copy()
+                for *_, BMP_coordinates in unique_intercomponent_contact_midpoints:
+                    structure_w_BMP.append("X", coords=BMP_coordinates, coords_are_cartesian=False)
+
+                # Create a SpacegroupAnalyzer
+                analyzer = SpacegroupAnalyzer(structure_w_BMP)
+                # Get the symmetrized structure
+                symmetrized_structure_w_BMP = analyzer.get_symmetrized_structure()
+
+                cif_writer = CifWriter(symmetrized_structure_w_BMP, symprec=0.01)
+                cif_writer.write_file(Path(save_structure_with_bond_midpoints_path) / f"{self.crystal_graph_name}_BMP.cif")
+
+            if save_slab_as_cif:
+
+                components_periodicities = [
+                    component['dimensionality']
+                    for component in
+                    get_structure_components(self.target_substructure.sg)
+                ]
+
+                if set(components_periodicities) != {2}:
+                    print('slab cannot be created')
+
+                else:
+
+                    # for num_comp, component in enumerate(get_structure_components(self.target_substructure.sg)):
+                    #     p, component_sg = component['dimensionality'], component['structure_graph']
+                    #     print('num_comp', num_comp, 'p', p, component_sg.structure.composition.formula.replace(" ", ""))
+                    #     print(component_sg.structure.frac_coords)
+
+                    N_supercell_in_c = np.ceil(min_slab_thickness / self.target_substructure.sg.structure.lattice.c)
+                    structure_multiplied = copy.copy(self.target_substructure.sg)
+                    structure_multiplied = structure_multiplied * [1, 1, N_supercell_in_c*2]
+                    # structure_multiplied.structure.to('structure_multiplied.cif')
+
+                    if len(get_structure_components(structure_multiplied)) % 2 != 0:
+                        print(f'!!! ERRONEOUS SLAB CREATION RESULT !!!:\n{len(get_structure_components(structure_multiplied))}')
+                        PMG_ERROR = True
+
+                    slab_frac_extreme_points = [0.0, 0.0]
+                    first_layer = True
+                    components_to_take = []
+                    # sort layered substructures from the one on the bottom of the unit cell to the one on top
+                    structure_multiplied_components = sorted(
+                        get_structure_components(structure_multiplied),
+                        key=lambda component: component['structure_graph'].structure.frac_coords[:, 2].min(),
+                        reverse=False,
+                    )
+
+                    for num_comp, component in enumerate(structure_multiplied_components):
+
+                        p, component_sg = component['dimensionality'], component['structure_graph']
+                        # print('num_comp', num_comp, 'p', p, component_sg.structure.composition.formula.replace(" ", ""))
+                        # print(component_sg.structure.frac_coords)
+                        frac_coord_thickness = component_sg.structure.frac_coords[:, 2].max() - component_sg.structure.frac_coords[:, 2].min()
+                        # if layer is divided by cell ab plane, skip this layer
+                        if frac_coord_thickness > 0.5:
+                            print(f'component {num_comp} is divided by unit cell', component_sg.structure.composition.formula.replace(" ", ""))
+                            # print(component_sg.structure)
+                            continue
+                        print(f'component {num_comp} is inside unit cell', component_sg.structure.composition.formula.replace(" ", ""))
+                        # print(component_sg.structure)
+
+                        if first_layer:
+                            slab_frac_extreme_points[0] = component_sg.structure.frac_coords[:, 2].min()
+                            slab_frac_extreme_points[1] = component_sg.structure.frac_coords[:, 2].max()
+                            first_layer = False
+                        else:
+                            slab_frac_extreme_points[1] = component_sg.structure.frac_coords[:, 2].max()
+
+                        components_to_take.append(component_sg.structure)
+                        slab_frac_thickness = slab_frac_extreme_points[1] - slab_frac_extreme_points[0]
+                        slab_cart_thickness = structure_multiplied.structure.lattice.c * slab_frac_thickness
+                        slab_cart_thickness *= np.sin(np.deg2rad(structure_multiplied.structure.lattice.beta))
+                        if slab_cart_thickness > min_slab_thickness:
+                            break
+                    print("components_to_take:", len(components_to_take), "slab_cart_thickness:", slab_cart_thickness)
+
+                    slab = components_to_take[0]
+                    if len(components_to_take) > 1:
+                        for component in components_to_take[1:]:
+                            for site in component:
+                                slab.append(site.specie, site.frac_coords, coords_are_cartesian=False)
+
+                    # slab.to('slab.cif')
+
+                    a_vec, b_vec, c_vec = slab.lattice.matrix
+                    ab_normal = np.cross(a_vec, b_vec)
+                    ab_normal /= np.linalg.norm(ab_normal)
+                    new_lattice = [a_vec, b_vec, ab_normal * (vacuum_space + slab_cart_thickness)]
+
+                    slab_with_vacuum = Structure(
+                        new_lattice,
+                        slab.species_and_occu,
+                        slab.cart_coords,
+                        site_properties=slab.site_properties,
+                        coords_are_cartesian=True,
+                    )
+
+                    slab_with_vacuum.to(Path(save_slab_as_cif_path) / f"{self.crystal_graph_name}_slab.cif", fmt='cif')
+
             print('unique_component_indices:', self.target_substructure.unique_component_indices)
+            # structure_multiplied_components = sorted(
+            #     get_structure_components(structure_multiplied),
+            #     key=lambda component: component['structure_graph'].structure.frac_coords[:, 2].min(),
+            #     reverse=False,
+            # )
             for idx, component in enumerate(
                     self.target_substructure.iter_components(inc_orientation=True, inc_site_ids=False)
             ):
@@ -430,19 +553,20 @@ class CrystalSubstructures:
                         print('layer is wholly inside unit cell')
 
                         if store_symmetrized_cell:
-                            S, geometric_layer_thickness, physical_layer_thickness, component_structure = _transform_layer_cell()
+                            S, geometric_layer_thickness, physical_layer_thickness, component_structure = _transform_layer_cell(idx)
                         else:
                             component_structure = component_sg.structure
 
                         if save_substructure_as_cif:
                             component_structure.to(save_path, fmt='cif')
 
-                    # otherwise we need to first put the layer inside
+                    # otherwise we need first to put the layer inside
                     else:
                         print('layer is divided by unit cell borders')
 
                         # make supercell; the bond translation vectors "to_jimage" will be recalculated
                         g_new = component_sg * [1, 1, 2]
+                        # g_new.structure.to('g_new.cif')
 
                         restoration_succeeded = False
                         for _, component in enumerate(
@@ -454,7 +578,7 @@ class CrystalSubstructures:
                             if p == 3 or set([d[2][2] for d in component_sg.graph.edges(data='to_jimage')]) == {0}:
 
                                 if store_symmetrized_cell:
-                                    S, geometric_layer_thickness, physical_layer_thickness, component_structure = _transform_layer_cell()
+                                    S, geometric_layer_thickness, physical_layer_thickness, component_structure = _transform_layer_cell(idx)
                                 else:
                                     component_structure = component_sg.structure
 
@@ -464,8 +588,6 @@ class CrystalSubstructures:
                                     component_structure.to(save_path, fmt='cif')
 
                         if not restoration_succeeded:
-                            # StructureGraphAnalysisException >>> pymatgen error
-                            # print(set([d[2] for d in component_sg.graph.edges(data='to_jimage')]))
                             raise utils.StructureGraphAnalysisException("pymatgen error")
 
                     self.target_substructure.component_dimensions[idx] = {
@@ -473,6 +595,7 @@ class CrystalSubstructures:
                         'geometric_layer_thickness': geometric_layer_thickness,
                         'physical_layer_thickness': physical_layer_thickness,
                         'save_path': str(save_path.absolute()) if save_substructure_as_cif else '',
+                        'PMG_ERROR': int(PMG_ERROR),
                     }
 
 
@@ -549,6 +672,7 @@ class CrystalSubstructureSearcherResults:
             self._calculate_additional_results()
 
         else:
+            self.ltm_used = ((0, ), (0, ), (0, ))
             self.intra_bvs = np.nan
             self.total_bvs = self.BVS_x_periodicity[3]
             self.unique_component_indices = ()
@@ -574,15 +698,15 @@ class CrystalSubstructureSearcherResults:
             self.mean_inter_bv = np.nan
             self.inter_bvs_per_interface = np.nan
             self.contact_A_weighted_inter_bv = np.nan
-
             self.intercomponent_contact_midpoint_WP = ''
 
     @property
     def show_monitor(self):
-        df = pd.DataFrame(self._monitor, columns=[
-            f'threshold_{self.bond_property}', 'broken_bond', 'periodicity_before',
-            f'periodicity_after', 'N_edges_removed', 'bvs_after_editing'
-        ])
+        df = pd.DataFrame(
+            self._monitor,
+            columns=[f'threshold_{self.bond_property}', 'broken_bond', 'periodicity_before',
+                     f'periodicity_after', 'N_edges_removed', 'bvs_after_editing']
+        )
 
         return df
 
@@ -709,19 +833,21 @@ class CrystalSubstructureSearcherResults:
             'crystal_graph_name': self.crystal_graph_name,
             'bond_property': self.bond_property,
             'target_periodicity': self.target_periodicity,
-            # 'LTM': tuple(tuple(arr) for arr in self.ltm_used),
+            'LTM': tuple(tuple(arr) for arr in self.ltm_used),
             'orientation_in_original_cell': [self._get_original_substructure_orientations(self.component_orientations[idx])
                                              for idx in self.unique_component_indices],
             'composition': [self.component_formulas[idx] for idx in self.unique_component_indices],
             'periodicity': [self.component_periodicity[idx] for idx in self.unique_component_indices],
             'estimated_charge': [self.component_charges[idx] for idx in self.unique_component_indices],
-            # 'S_A^2': [self.component_dimensions.get(idx, dict()).get('S', np.nan)
+            # 'S_A2': [self.component_dimensions.get(idx, dict()).get('S', np.nan)
             #           for idx in self.unique_component_indices],
             'geometric_layer_thickness': [self.component_dimensions.get(idx, dict()).get('geometric_layer_thickness', np.nan)
                                           for idx in self.unique_component_indices],
             'physical_layer_thickness': [self.component_dimensions.get(idx, dict()).get('physical_layer_thickness', np.nan)
                                           for idx in self.unique_component_indices],
             'save_path': [self.component_dimensions.get(idx, dict()).get('save_path', '')
+                          for idx in self.unique_component_indices],
+            'PMG_ERROR': [self.component_dimensions.get(idx, dict()).get('PMG_ERROR', '')
                           for idx in self.unique_component_indices],
             'components_per_cell_count': self.components_per_cell_count,
             'components_per_cell_formula': self.components_per_cell_formula,

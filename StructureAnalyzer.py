@@ -63,13 +63,18 @@ class CrystalSubstructureSearcher:
             restored_crystal_substructures (Optional[CrystalSubstructures]): Stores restored substructures.
             _substructure_periodicities (set): Tracks identified substructure periodicities in the graph.
             _ltm_is_identified (bool): Indicates whether a lattice transformation matrix is identified.
-            _ltm (Optional[np.ndarray]): Stores the lattice transformation matrix.
+            _ltm (tuple): Stores the lattice transformation matrix.
+            _atom_valences (Optional[defaultdict]): Store atom valences.
+            _intercomponent_contacts_in_original_cell (Optional[List[Contact]]): List of Contacts objects corresponding
+                to inter contacts in the original cell
 
         The method also initializes the crystal graph without lattice transformation.
         """
+
         self.target_periodicity = target_periodicity
         self.crystal_graph_name = Path(file_name).stem
         self.bond_property = bond_property
+        self._initial_cell: Optional[Structure] = None  # original structure
         self.structure = self._read_in_structure(file_name)
         self._connectivity_calculator = connectivity_calculator
 
@@ -99,37 +104,18 @@ class CrystalSubstructureSearcher:
 
         The method performs the following steps:
         - Reads the primitive cell from the CIF file.
-        - Uses SpacegroupAnalyzer to determine the conventional standard structure.
-        - Returns the conventional structure for further analysis.
         """
         read_in_structure = Structure.from_file(file_name, primitive=False)
+
         print(
-            f"Read-in structure\n"
-            f"space_group: {read_in_structure.get_space_group_info()[0]}\n"
+            f"\n{'#'*60}\nRead-in structure: {self.crystal_graph_name}\n"
+            f"space group: {read_in_structure.get_space_group_info()[0]}\n"
             f"cell a_b_c: {read_in_structure.lattice.abc}\n"
             f"cell alpha_beta_gamma: {read_in_structure.lattice.angles}\n"
         )
 
-        # Read the primitive cell from the CIF file
-        primitive_structure = Structure.from_file(file_name, primitive=True)
-
-        # Get the conventional cell using symmetry analysis
-        sga = SpacegroupAnalyzer(primitive_structure)
-        conventional_structure = sga.get_conventional_standard_structure()
-
-        new_space_group = sga.get_space_group_symbol()  # Space group of the conventional structure
-        new_space_group_number = sga.get_space_group_number()
-        # TODO: Add comparison between primitive and conventional structures, and notify if they differ
-        print(
-            f"Standardised structure\n"
-            f"new_space_group: {new_space_group}\n"
-            f"cell a_b_c: {conventional_structure.lattice.abc}\n"
-            f"cell alpha_beta_gamma: {conventional_structure.lattice.angles}\n"
-        )
-
-        self._new_space_group_number = new_space_group_number
-
-        return conventional_structure
+        self._initial_cell = read_in_structure.copy()
+        return read_in_structure
 
     def _add_weight_to_graph_edges(self, site_idx: int, neighbor_data: Dict, calculate_valences: bool,
                                    suspicious_BV_threshold: float = 5.0) -> None:
@@ -166,7 +152,8 @@ class CrystalSubstructureSearcher:
 
         # Compute bond valence (BV) using utility function
         BV, BV_calc_method = utils.calculate_BV((R, central_atom, neighbour_atom))
-        BV = round(BV, 5)  # Round for consistency
+        BV = round(BV, 5) + 1e-6  # Round for consistency and add minuscule weight for stability
+        # ??? weight 0.0 for StructureGraph not acceptable ???
 
         # If BV is suspiciously high, add it to the suspicious contacts list
         if BV > suspicious_BV_threshold:
@@ -182,7 +169,7 @@ class CrystalSubstructureSearcher:
             to_index=neighbor_data["site_index"],
             to_jimage=neighbor_data["image"],
             edge_properties=edge_properties,
-            weight=edge_properties[self.bond_property],  # Use selected bond property as the weight
+            weight=edge_properties[self.bond_property],  # Use selected bond property as the edge weight
             warn_duplicates=False,
         )
 
@@ -260,7 +247,7 @@ class CrystalSubstructureSearcher:
                 (f'(!!!) The crystal structure graph periodicity is {structure_graph_periodicity} < 3 (!!!)\n'
                  f'Possible reasons: the crystal structure might be unreasonable, or\n'
                  f'consider decreasing the `tol` parameter in the VoronoiNN instance\n'
-                 f'to allow more interatomic contacts to be identified.')
+                 f'to allow more interatomic contacts to be identified')
             )
 
     def _calculate_SG_BV_sum(self, sg: StructureGraph) -> float:
@@ -311,8 +298,6 @@ class CrystalSubstructureSearcher:
             delta = -delta
 
         # Extract and sort unique bond property weights
-        # TypeError: '<=' not supported between instances of 'float' and 'NoneType'
-        # print([t for t in self.sg.graph.edges(data='weight') if t[2] is None])
         unique_weights = set(np.round(self.sg.weight_statistics['all_weights'], decimals=decimals))
         unique_weights = np.array(sorted(unique_weights, reverse=reverse))
         # add small delta for them to serve as thresholds
@@ -329,9 +314,8 @@ class CrystalSubstructureSearcher:
             periodicity = component['dimensionality']
             orientation = component['orientation'] if component['orientation'] is not None else '_'
             composition = component['structure_graph'].structure.composition.formula.replace(" ", "")
-            fragment_sites = component['site_ids']
             if verbose:
-                print(f'TARGET SUBSTRUCTURE {periodicity}-p, component {i}: {orientation}, {composition}, {fragment_sites}')
+                print(f'TARGET SUBSTRUCTURE {periodicity}-p component {i}: {orientation}, {composition}')
 
             if periodicity == 2:
                 _2p_substructures_orientations.add(orientation)
@@ -381,7 +365,8 @@ class CrystalSubstructureSearcher:
             )
         ]
 
-        print('\nRestoring intrafragment contacts')
+        print('\nRestoring intracomponent contacts')
+        print(f'NUM_CONTACTS in original graph: {len(self.sg.graph.edges())}')
         for n, low_p_substructure in enumerate(low_periodic_substructures):
 
             for i, component in enumerate(
@@ -391,13 +376,14 @@ class CrystalSubstructureSearcher:
                 orientation = component['orientation'] if component['orientation'] is not None else '_'
                 composition = component['structure_graph'].structure.composition.formula.replace(" ", "")
                 fragment_sites = component['site_ids']
-                print(f'Substructure {n+1}, {periodicity}-p component {i+1}: {orientation}, {composition}, {fragment_sites}')
+                print(f'Substructure {n+1}, {periodicity}-p component {i}: {orientation}, {composition}')
 
             # BV sum BEFORE restoring INTRA fragment contacts
             _edited_graph_total_bvs = self._calculate_SG_BV_sum(low_p_substructure['sg'])
 
             tic = time()
-            print(f"NUM CONTACTS in the edited graph {len(low_p_substructure['sg'].graph.edges())}")
+            print(f"NUM_CONTACTS in the edited graph: {len(low_p_substructure['sg'].graph.edges())}")
+            print(f"TOTAL_BVS in the edited graph: {_edited_graph_total_bvs:.3f}")
 
             test_graph_1 = copy.copy(low_p_substructure['sg'])
             # Try to restore contacts iteratively starting from the strongest ones
@@ -420,11 +406,10 @@ class CrystalSubstructureSearcher:
                 if get_dimensionality_larsen(test_graph_2) <= low_p_substructure['max_periodicity']:
                     test_graph_1 = test_graph_2  # Accept restored contacts
                 else:
-                    test_graph_1 = test_graph_1 # Reject if periodicity increases
+                    test_graph_1 = test_graph_1  # Reject if periodicity increases
 
             low_p_substructure['sg'] = test_graph_1
             inter_contacts = self.sg.diff(test_graph_1)['self']
-
 
             # here we get the info on the inter contacts in the !!! original cell !!! of the structure
             # to calculate some descriptors using original lattice
@@ -458,8 +443,11 @@ class CrystalSubstructureSearcher:
             # BV sum AFTER restoring INTRA fragment contacts
             _restored_graph_total_bvs = self._calculate_SG_BV_sum(low_p_substructure['sg'])
 
-            print(f"edited_graph_total_bvs: {_edited_graph_total_bvs:.3f}")
-            print(f"restored_graph_total_bvs: {_restored_graph_total_bvs:.3f}")
+            toc = time()
+            print(f"NUM_CONTACTS in the restored graph: {len(low_p_substructure['sg'].graph.edges())}")
+            print(f"TOTAL_BVS in the restored graph: {_restored_graph_total_bvs:.3f}")
+            print(f"NUM_INTER_CONTACTS: {len(inter_contacts)}")
+            print(f"TIME required to restore graph: {toc - tic:.1f} sec\n")
 
             # Store the restored substructure
             substructures[low_p_substructure['max_periodicity']].append(
@@ -471,10 +459,6 @@ class CrystalSubstructureSearcher:
                     BVS=self._calculate_SG_BV_sum(low_p_substructure['sg'])
                 )
             )
-
-            toc = time()
-            print(f"NUM CONTACTS in the restored graph {len(low_p_substructure['sg'].graph.edges())}")
-            print(f"TIME required to restore graph {toc - tic:.1f} sec")
 
         return substructures
 
@@ -497,13 +481,14 @@ class CrystalSubstructureSearcher:
         Raises:
             utils.IntraContactsRestorationError: If the periodicity changes unexpectedly after restoration.
         """
-        print('\nRestoring intra contacts in TARGET SUBSTRUCTURE')
-        print(f"NUM CONTACTS in the edited graph {len(target_substructure['sg'].graph.edges())}")
+        print('\nRestoring intracomponent contacts in TARGET SUBSTRUCTURE')
 
         # BV sum BEFORE restoring INTRA fragment contacts
         _edited_graph_total_bvs = self._calculate_SG_BV_sum(target_substructure['sg'])
 
         tic = time()
+        print(f"NUM_CONTACTS in the edited graph: {len(target_substructure['sg'].graph.edges())}")
+        print(f"TOTAL_BVS in the edited graph: {_edited_graph_total_bvs:.3f}")
 
         # first check if there are no crossing 2-p substructures (like in CoU6 ICSD 108323)
         self._check_plane_crossing(target_substructure['sg'])
@@ -547,13 +532,11 @@ class CrystalSubstructureSearcher:
         # BV sum AFTER restoring INTRA fragment contacts
         _restored_graph_total_bvs = self._calculate_SG_BV_sum(target_substructure['sg'])
 
-        print(f"edited_graph_total_bvs: {_edited_graph_total_bvs:.3f}")
-        print(f"restored_graph_total_bvs: {_restored_graph_total_bvs:.3f}")
-        print(f"inter_contacts {len(self.sg.diff(target_substructure['sg'])['self'])}")
-
         toc = time()
-        print(f"NUM CONTACTS in the restored graph {len(target_substructure['sg'].graph.edges())}")
-        print(f"TIME required to restore graph {toc - tic:.2f} sec")
+        print(f"NUM_CONTACTS in the restored graph: {len(target_substructure['sg'].graph.edges())}")
+        print(f"TOTAL_BVS in the restored graph: {_restored_graph_total_bvs:.3f}")
+        print(f"NUM_INTER_CONTACTS: {len(self.sg.diff(target_substructure['sg'])['self'])}")
+        print(f"TIME required to restore graph: {toc - tic:.1f} sec")
 
         # Return the restored target substructure
         restored_target_crystal_substructure = TargetSubstructure(
@@ -565,6 +548,7 @@ class CrystalSubstructureSearcher:
             BVS=self._calculate_SG_BV_sum(target_substructure['sg']),
             total_BVS=target_substructure['total_BVS'],
             ltm_used=self._ltm,
+            initial_cell=self._initial_cell,
         )
 
         return restored_target_crystal_substructure
@@ -590,26 +574,23 @@ class CrystalSubstructureSearcher:
 
         # Ensure we have got substructure with target periodicity before proceeding
         if not self._substructure_periodicities or self.target_periodicity not in self._substructure_periodicities:
-            print('!!! Target periodicity substructure is not found !!!')
+            print(f'(!!!) Substructure of target periodicity {self.target_periodicity} was not found (!!!)')
             self._ltm_is_identified = False
             return None
 
         results = []
-
         # Iterate over low-periodic substructures to determine the best transformation matrix
         for i, substructure_dict in enumerate(low_periodic_substructure_graphs, start=1):
-            for component in get_structure_components(substructure_dict['sg'], inc_orientation=True, inc_site_ids=True):
+            for component in get_structure_components(substructure_dict['sg'], inc_orientation=True, inc_site_ids=False):
                 periodicity = component['dimensionality']
                 orientation = component['orientation']
                 hkl_uvw = np.array(orientation) if orientation is not None else 0
-                component_sites = component['site_ids']
-                print(f'Substructure {i}, component {periodicity}-p {orientation}, N_sites {len(component_sites)}')
+                print(f'Substructure {i}, component {periodicity}-p {orientation}')
 
                 # Compute transformation matrix based on target periodicity
                 if periodicity == self.target_periodicity:
 
                     # check target periodicity component count here
-
                     if self.target_periodicity == 2:
                         result = utils.calculate_ltm_for_hkl(
                             target_hkl=hkl_uvw, initial_lattice_vectors=self.sg.structure.lattice.matrix
@@ -700,7 +681,7 @@ class CrystalSubstructureSearcher:
                     {
                         'max_periodicity': periodicity_after,
                         'sg': copy.copy(sg_copy),
-                        'deleted_contacts': copy.copy(threshold_deleted_contacts),  # NB copy.copy(deleted_contacts)
+                        'deleted_contacts': copy.copy(threshold_deleted_contacts),  # NB!!! copy.copy(deleted_contacts)
                      }
                 )
 
