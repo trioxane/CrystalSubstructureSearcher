@@ -17,6 +17,7 @@ connectivity_calculation_parameters:
 structure_graph_analysis_parameters:
   bond_property: "BV"  # BV, R, SA, A, PI
   target_periodicity: 2
+  supercell_extent: 2
 
 
 save_options:
@@ -25,7 +26,7 @@ save_options:
   save_slab_as_cif: False
   save_bulk_as_cif: False
   store_symmetrized_cell: True
-  vacuum_space: 15.0
+  vacuum_space: 20.0
   min_slab_thickness: 20.0
 
 

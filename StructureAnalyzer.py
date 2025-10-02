@@ -7,7 +7,6 @@ from collections import defaultdict
 import numpy as np
 
 from pymatgen.core import Structure
-from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.graphs import StructureGraph
 from pymatgen.analysis.local_env import VoronoiNN
 from pymatgen.analysis.dimensionality import get_dimensionality_larsen, get_structure_components
@@ -106,9 +105,11 @@ class CrystalSubstructureSearcher:
         - Reads the primitive cell from the CIF file.
         """
         read_in_structure = Structure.from_file(file_name, primitive=False)
+        # read_in_structure.to('readin.cif')
 
         print(
-            f"\n{'#'*60}\nRead-in structure: {self.crystal_graph_name}\n"
+            f"\n{'#'*60}\nInput structure filename: {self.crystal_graph_name}\n"
+            f"composition: {read_in_structure.composition.formula.replace(' ', '')}\n"
             f"space group: {read_in_structure.get_space_group_info()[0]}\n"
             f"cell a_b_c: {read_in_structure.lattice.abc}\n"
             f"cell alpha_beta_gamma: {read_in_structure.lattice.angles}\n"
@@ -176,13 +177,17 @@ class CrystalSubstructureSearcher:
         if calculate_valences:
             self._atom_valences[site_idx] += BV
 
-    def _create_structure_graph(self, transform_lattice: bool = False, calculate_valences: bool = False) -> None:
+    def _create_structure_graph(self, transform_lattice: bool = False, calculate_valences: bool = False, N: int = 2) -> None:
         """
         Creates a StructureGraph instance from the Structure by calculating connectivity
         and adding attributes to the crystal structure graph edges.
 
         Args:
             transform_lattice (bool, optional): If True, transforms the lattice using LTM before constructing the graph.
+            calculate_valences (bool, optional): If True store data on atom valences.
+            N (int, optional): Determines the extension of the cell into supercell. N=2 is usually enough,
+            but in some cases larger N may be required if the substructure extends over multiple unit cells, e.g.
+            in ICSD 196 - 1-p substructure, ICSD 195327 - 2-p substructure.
 
         The method performs the following steps:
         - If lattice transformation is requested, it applies the transformation if identified.
@@ -215,11 +220,11 @@ class CrystalSubstructureSearcher:
 
                 # Additional expansion depending on target periodicity
                 if self.target_periodicity == 2:
-                    self.structure.make_supercell((1, 1, 2))  # Expand along c direction
+                    self.structure.make_supercell((1, 1, N))  # Expand along c direction
                 elif self.target_periodicity == 1:
-                    self.structure.make_supercell((2, 2, 1))  # Expand along a and b directions
+                    self.structure.make_supercell((N, N, 1))  # Expand along a and b directions
                 elif self.target_periodicity == 0:
-                    self.structure.make_supercell((2, 2, 2))  # Expand in all three directions
+                    self.structure.make_supercell((N, N, N))  # Expand in all three directions
 
                 print(f'Lattice was transformed')
                 print(f'Total sites after 2nd transformation: {self.structure.num_sites}')
@@ -433,7 +438,6 @@ class CrystalSubstructureSearcher:
                             )
                 self._intercomponent_contacts_in_original_cell = intercomponent_contacts
 
-
             # Ensure periodicity is preserved after restoration
             if get_dimensionality_larsen(low_p_substructure['sg']) != low_p_substructure['max_periodicity']:
                 raise utils.IntraContactsRestorationError(
@@ -585,7 +589,7 @@ class CrystalSubstructureSearcher:
                 periodicity = component['dimensionality']
                 orientation = component['orientation']
                 hkl_uvw = np.array(orientation) if orientation is not None else 0
-                print(f'Substructure {i}, component {periodicity}-p {orientation}')
+                # print(f'Substructure {i}, component {periodicity}-p {orientation}')
 
                 # Compute transformation matrix based on target periodicity
                 if periodicity == self.target_periodicity:
@@ -734,7 +738,6 @@ class CrystalSubstructureSearcher:
                     broken_bond = sorted([sg_copy.graph.nodes[node]['element'] for node in (node1, node2)])
                     broken_bond_elements = tuple(broken_bond)
 
-                    # ((1, 2, (1, 0, -1), edge_data_dict, ['El1', 'El2'])
                     threshold_deleted_contacts[(broken_bond_elements, edge_data['BV'])].append(
                         ((node1, node2, edge_data['to_jimage']), edge_data, broken_bond)
                     )
@@ -764,7 +767,7 @@ class CrystalSubstructureSearcher:
 
         return restored_target_substructure
 
-    def analyze_graph(self) -> CrystalSubstructures:
+    def analyze_graph(self, N=2) -> CrystalSubstructures:
         """
         Performs a full analysis of the crystal graph by iteratively removing edges
         until the target periodicity substructure are identified.
@@ -783,7 +786,7 @@ class CrystalSubstructureSearcher:
         restored_crystal_substructures = self._analyze_graph1()
 
         # Step 2: Create a new structure graph using the identified lattice transformation
-        self._create_structure_graph(transform_lattice=True, calculate_valences=True)
+        self._create_structure_graph(transform_lattice=True, calculate_valences=True, N=N)
 
         # Step 3: Run the second graph analysis to extract the target substructure
         restored_target_crystal_substructure = self._analyze_graph2()

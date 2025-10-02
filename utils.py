@@ -1,13 +1,12 @@
 import itertools
 import json
-from typing import Tuple, Dict, Sequence, Union
+from typing import Tuple, Sequence, Union
 from math import gcd
-from ast import literal_eval
 
 import pandas as pd
 import numpy as np
 
-from pymatgen.core.operations import SymmOp
+from pymatgen.analysis.dimensionality import get_dimensionality_larsen
 from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.core.sites import PeriodicSite
@@ -455,3 +454,33 @@ class npEncoder(json.JSONEncoder):
         if isinstance(obj, np.int32) or isinstance(obj, np.int64):
             return int(obj)
         return json.JSONEncoder.default(self, obj)
+
+
+def is_component_inside_cell(component_graph) -> bool:
+    """
+    Check if graph component is within unit cell boundaries.
+
+    Args:
+        component_graph (CrystalGraph): CrystalGraph of component.
+
+    Returns:
+        bool: True if graph component is within unit cell boundaries.
+    """
+    component_periodicity = get_dimensionality_larsen(component_graph)
+
+    # for edge with translation (a, b, c)
+    if component_periodicity == 2:
+        # no translation outside cell in c direction
+        check_result = {d[2][2] for d in component_graph.graph.edges(data='to_jimage')} == {0, }
+
+    elif component_periodicity == 1:
+        # no translation outside cell in a and b directions
+        check_result = {(d[2][0], d[2][1]) for d in component_graph.graph.edges(data='to_jimage')} == {(0, 0)}
+
+    elif component_periodicity == 0:
+        check_result = True
+
+    else:
+        check_result = False
+
+    return check_result

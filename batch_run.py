@@ -53,7 +53,6 @@ def main():
 
     for i, f in enumerate(cif_files):
         filename = Path(f).stem
-        print(f'Start analysis: {filename}')
         tic = time.time()
 
         try:
@@ -63,7 +62,7 @@ def main():
                 bond_property=graph_cfg['bond_property'],
                 target_periodicity=graph_cfg['target_periodicity'],
             )
-            crystal_substructures = css.analyze_graph()
+            crystal_substructures = css.analyze_graph(N=graph_cfg['supercell_extent'])
 
             crystal_substructures.save_substructure_components(
                 save_components_path=paths['save_low_p_components_path'],
@@ -96,8 +95,8 @@ def main():
 
     # === Save results ===
     pd.DataFrame(run_results).explode(
-        column=['orientation_in_original_cell', 'composition', 'periodicity',
-                'estimated_charge', 'inter_bvs_per_unit_area',
+        column=['orientation_in_original_cell', 'component_formula', 'periodicity',
+                'estimated_charge', 'inter_bvs_per_unit_size',
                 'geometric_layer_thickness', 'physical_layer_thickness', 'save_path']
     ).to_excel(f"CSS_results_{timestamp}.xlsx")
 
