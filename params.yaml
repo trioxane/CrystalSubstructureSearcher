@@ -1,5 +1,5 @@
 paths:
-  input_cif_files_folder: "./input_cifs"
+  input_cif_files_folder: "./examples"
   save_low_p_components_path: "./low_p_components"
   save_structure_with_bond_midpoints_path: "./cifs_with_BMPs"
   save_slab_as_cif_path: "./slabs"
