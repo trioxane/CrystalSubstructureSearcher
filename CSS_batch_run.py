@@ -51,7 +51,7 @@ def main():
     run_results = []
     cif_files = glob.glob(str(Path(paths['input_cif_files_folder']) / "*.cif"))
 
-    for i, f in enumerate(cif_files):
+    for _, f in enumerate(cif_files):
         filename = Path(f).stem
         tic = time.time()
 
@@ -103,7 +103,7 @@ def main():
     with open(f"CSS_results_{timestamp}.json", "w") as out_json:
         json.dump(run_results, out_json, cls=utils.npEncoder)
 
-    with open(f"params_{timestamp}.yaml", "w") as out_yaml:
+    with open(f"CSS_params_{timestamp}.yaml", "w") as out_yaml:
         yaml.dump(config, out_yaml, sort_keys=False)
 
 

@@ -580,7 +580,7 @@ class CrystalSubstructures:
                 cif_writer.write_file(Path(save_structure_with_bond_midpoints_path) / f"{self.crystal_graph_name}_BMP.cif")
 
             if save_slab_as_cif:
-
+                # TODO charged slabs obtained for ICSD 351 - for now error can be solved by increasing min slab thickness by user
                 components_periodicities = [
                     component['dimensionality']
                     for component in
