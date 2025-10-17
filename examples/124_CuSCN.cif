@@ -1,76 +1,41 @@
-data_3126-TOPOS_124_Cu(SCN)
-_database_code_ICSD                 124
-_audit_creation_date                2024-03-26
-_audit_creation_method              ToposPro
-_chemical_formula_structural        Cu(SCN)
-_chemical_name_systematic
-;
-Copper(I) thiocyanate.. 
-;
-_chemical_formula_sum               'C Cu N S'
-_citation_journal_abbrev            'Inorganica Chimica Acta'
-_citation_year                      1976
-_citation_journal_volume            17
-_citation_page_first                161
-_citation_page_last                 165
-_citation_special_details
-;
-Citation details: Title: Crystal structure of copper(I) thiocyanate a
-nd its relation tothe crystalstructure of copper(II) diammine dithioc
-yanate complex. File: YourCustomFileName1.cif. 
-CENTAT: none
-LIGAND
-: CuSNC[3D-]
-ATOMLIG: C1#1 N1#1 S1#1 Cu1#1
-SIMPPAR: METH=Stand; INT
-RA=V
-;
-loop_
-_publ_author_name
-'Kabesova M.'
-'Dunaj JURCO M.'
-'Serator M.'
-'Gazo J.'
-_cell_length_a                      10.994
-_cell_length_b                      7.224
-_cell_length_c                      6.662
-_cell_angle_alpha                   90
-_cell_angle_beta                    90
-_cell_angle_gamma                   90
-_cell_volume                        529.1004
-_cell_formula_units_z               8
-_symmetry_space_group_name_h-m      'P b c a'
-_symmetry_int_tables_number         61
-_refine_ls_r_factor_all             0
-loop_
-_space_group_symop_id
-_space_group_symop_operation_xyz
-1 x,y,z
-2 1/2-x,-y,1/2+z
-3 1/2+x,1/2-y,-z
-4 -x,1/2+y,1/2-z
-5 -x,-y,-z
-6 1/2+x,y,1/2-z
-7 1/2-x,1/2+y,z
-8 x,1/2-y,1/2+z
-loop_
-_atom_type_symbol
-_atom_type_oxidation_number
-C4+ 4
-N3- -3
-S2- -2
-Cu1+ 1
-loop_
-_atom_site_label
-_atom_site_type_symbol
-_atom_site_symmetry_multiplicity
-_atom_site_fract_x
-_atom_site_fract_y
-_atom_site_fract_z
-_atom_site_occupancy
-C1 C4+ 8 0.92453 0.29429 0.13920 1.0000
-N1 N3- 8 0.01656 0.23210 0.11760 1.0000
-S1 S2- 8 0.78357 0.38390 0.17407 1.0000
-Cu1 Cu1+ 8 0.18428 0.15640 0.13598 1.0000
-#End of data_3126-TOPOS_124_Cu(SCN)
 
+#======================================================================
+# CRYSTAL DATA
+#----------------------------------------------------------------------
+data_VESTA_phase_1
+
+_chemical_name_common                  'C Cu N S'
+_cell_length_a                         10.994000
+_cell_length_b                         7.224000
+_cell_length_c                         6.662000
+_cell_angle_alpha                      90.000000
+_cell_angle_beta                       90.000000
+_cell_angle_gamma                      90.000000
+_cell_volume                           529.100444
+_space_group_name_H-M_alt              'P b c a'
+_space_group_IT_number                 61
+
+loop_
+_space_group_symop_operation_xyz
+   'x, y, z'
+   '-x, -y, -z'
+   '-x+1/2, -y, z+1/2'
+   'x+1/2, y, -z+1/2'
+   '-x, y+1/2, -z+1/2'
+   'x, -y+1/2, z+1/2'
+   'x+1/2, -y+1/2, -z'
+   '-x+1/2, y+1/2, z'
+
+loop_
+   _atom_site_label
+   _atom_site_occupancy
+   _atom_site_fract_x
+   _atom_site_fract_y
+   _atom_site_fract_z
+   _atom_site_adp_type
+   _atom_site_U_iso_or_equiv
+   _atom_site_type_symbol
+   C1         1.0     0.924530     0.294290     0.139200    Uiso  ? C
+   N1         1.0     0.016560     0.232100     0.117600    Uiso  ? N
+   S1         1.0     0.783570     0.383900     0.174070    Uiso  ? S
+   Cu1        1.0     0.184280     0.156400     0.135980    Uiso  ? Cu

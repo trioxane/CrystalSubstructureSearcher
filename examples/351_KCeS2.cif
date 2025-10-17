@@ -1,99 +1,68 @@
-data_19531-TOPOS_351_KCeS2
-_database_code_ICSD                 351
-_audit_creation_date                2024-03-26
-_audit_creation_method              ToposPro
-_chemical_formula_structural        KCeS2
-_chemical_name_systematic
-;
-Potassium cerium sulfide.. 
-;
-_chemical_formula_sum               'Ce K S2'
-_citation_journal_abbrev            'Acta Crystallographica B (24,1968-38,1982)'
-_citation_year                      1976
-_citation_journal_volume            32
-_citation_page_first                1856
-_citation_page_last                 1858
-_citation_special_details
-;
-Citation details: Title: The crystal structure of K Ce S2. Space Grou
-p: R -3 m H->R -3m. File: YourCustomFileName1.cif. 
-CENTAT: none
-LI
-GAND: CeKS2[3D-]
-ATOMLIG: S1#1 K1#1 Ce1#1
-SIMPPAR: METH=Stand; INTR
-A=V
-;
-loop_
-_publ_author_name
-'Plug C.'
-'Verschoor G.C.'
-_cell_length_a                      4.228
-_cell_length_b                      4.228
-_cell_length_c                      21.8
-_cell_angle_alpha                   90
-_cell_angle_beta                    90
-_cell_angle_gamma                   120
-_cell_volume                        337.487
-_cell_formula_units_z               3
-_symmetry_space_group_name_h-m      'R -3 m'
-_symmetry_int_tables_number         166
-_refine_ls_r_factor_all             0
-loop_
-_space_group_symop_id
-_space_group_symop_operation_xyz
-1 x,y,z
-2 -y,x-y,z
-3 -x+y,-x,z
-4 x-y,-y,-z
-5 -x,-x+y,-z
-6 y,x,-z
-7 -x,-y,-z
-8 y,-x+y,-z
-9 x-y,x,-z
-10 -x+y,y,z
-11 x,x-y,z
-12 -y,-x,z
-13 2/3+x,1/3+y,1/3+z
-14 1/3+x,2/3+y,2/3+z
-15 2/3-y,1/3+x-y,1/3+z
-16 1/3-y,2/3+x-y,2/3+z
-17 2/3-x+y,1/3-x,1/3+z
-18 1/3-x+y,2/3-x,2/3+z
-19 2/3+x-y,1/3-y,1/3-z
-20 1/3+x-y,2/3-y,2/3-z
-21 2/3-x,1/3-x+y,1/3-z
-22 1/3-x,2/3-x+y,2/3-z
-23 2/3+y,1/3+x,1/3-z
-24 1/3+y,2/3+x,2/3-z
-25 2/3-x,1/3-y,1/3-z
-26 1/3-x,2/3-y,2/3-z
-27 2/3+y,1/3-x+y,1/3-z
-28 1/3+y,2/3-x+y,2/3-z
-29 2/3+x-y,1/3+x,1/3-z
-30 1/3+x-y,2/3+x,2/3-z
-31 2/3-x+y,1/3+y,1/3+z
-32 1/3-x+y,2/3+y,2/3+z
-33 2/3+x,1/3+x-y,1/3+z
-34 1/3+x,2/3+x-y,2/3+z
-35 2/3-y,1/3-x,1/3+z
-36 1/3-y,2/3-x,2/3+z
-loop_
-_atom_type_symbol
-_atom_type_oxidation_number
-S2- -2
-K1+ 1
-Ce3+ 3
-loop_
-_atom_site_label
-_atom_site_type_symbol
-_atom_site_symmetry_multiplicity
-_atom_site_fract_x
-_atom_site_fract_y
-_atom_site_fract_z
-_atom_site_occupancy
-S1 S2- 6 0.00000 0.00000 0.26346 1.0000
-K1 K1+ 3 0.00000 0.00000 0.50000 1.0000
-Ce1 Ce3+ 3 0.00000 0.00000 0.00000 1.0000
-#End of data_19531-TOPOS_351_KCeS2
 
+#======================================================================
+# CRYSTAL DATA
+#----------------------------------------------------------------------
+data_VESTA_phase_1
+
+_chemical_name_common                  'Ce K S2'
+_cell_length_a                         4.228000
+_cell_length_b                         4.228000
+_cell_length_c                         21.799999
+_cell_angle_alpha                      90.000000
+_cell_angle_beta                       90.000000
+_cell_angle_gamma                      120.000000
+_cell_volume                           337.487041
+_space_group_name_H-M_alt              'R -3 m'
+_space_group_IT_number                 166
+
+loop_
+_space_group_symop_operation_xyz
+   'x, y, z'
+   '-x, -y, -z'
+   '-y, x-y, z'
+   'y, -x+y, -z'
+   '-x+y, -x, z'
+   'x-y, x, -z'
+   'y, x, -z'
+   '-y, -x, z'
+   'x-y, -y, -z'
+   '-x+y, y, z'
+   '-x, -x+y, -z'
+   'x, x-y, z'
+   'x+2/3, y+1/3, z+1/3'
+   '-x+2/3, -y+1/3, -z+1/3'
+   '-y+2/3, x-y+1/3, z+1/3'
+   'y+2/3, -x+y+1/3, -z+1/3'
+   '-x+y+2/3, -x+1/3, z+1/3'
+   'x-y+2/3, x+1/3, -z+1/3'
+   'y+2/3, x+1/3, -z+1/3'
+   '-y+2/3, -x+1/3, z+1/3'
+   'x-y+2/3, -y+1/3, -z+1/3'
+   '-x+y+2/3, y+1/3, z+1/3'
+   '-x+2/3, -x+y+1/3, -z+1/3'
+   'x+2/3, x-y+1/3, z+1/3'
+   'x+1/3, y+2/3, z+2/3'
+   '-x+1/3, -y+2/3, -z+2/3'
+   '-y+1/3, x-y+2/3, z+2/3'
+   'y+1/3, -x+y+2/3, -z+2/3'
+   '-x+y+1/3, -x+2/3, z+2/3'
+   'x-y+1/3, x+2/3, -z+2/3'
+   'y+1/3, x+2/3, -z+2/3'
+   '-y+1/3, -x+2/3, z+2/3'
+   'x-y+1/3, -y+2/3, -z+2/3'
+   '-x+y+1/3, y+2/3, z+2/3'
+   '-x+1/3, -x+y+2/3, -z+2/3'
+   'x+1/3, x-y+2/3, z+2/3'
+
+loop_
+   _atom_site_label
+   _atom_site_occupancy
+   _atom_site_fract_x
+   _atom_site_fract_y
+   _atom_site_fract_z
+   _atom_site_adp_type
+   _atom_site_U_iso_or_equiv
+   _atom_site_type_symbol
+   S1         1.0     0.000000     0.000000     0.263460    Uiso  ? S
+   K1         1.0     0.000000     0.000000     0.500000    Uiso  ? K
+   Ce1        1.0     0.000000     0.000000     0.000000    Uiso  ? Ce
