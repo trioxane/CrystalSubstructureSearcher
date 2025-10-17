@@ -47,9 +47,11 @@ The program uses an iterative edge-removal algorithm that progressively breaks t
 
 5. example of the dependence of the identified 2-p substructure on the bond strength criteria
 
-```python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property BV```
+```
+python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property BV
+python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property SA
+python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property A
+```
 
-```python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property SA```
-
-```python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property A```
-
+6. batch run with parameters specified in the params.yaml file
+```python CSS_batch_run.py```
