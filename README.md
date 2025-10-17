@@ -26,3 +26,30 @@ The program uses an iterative edge-removal algorithm that progressively breaks t
 ![Workflow](images/algo_example.png)
 
 **Figure 1.** *The first iterations of the Ca2Sb structure (ICSD refcode 154) analysis leading to identification of the 2-periodic substructure. The bond valences are selected as edge weight in this example. The edges of the structure graph broken at each iteration are highlighted in red, their characteristics are shown in the table below. The edges restored at the final step are shown in green. BVS total is the sum of the bond valences of the retained edges in the graph components.*
+
+## Example usage
+
+1. simple run
+
+```python CSS_run.py -f .\examples\154_Ca2Sb.cif```
+
+2. search for 1-p (chains) substructure
+
+```python CSS_run.py -f .\examples\124_CuSCN.cif --target-periodicity 1```
+
+3. increasing default vacuum space in the CIF file with identified 2-p (layers) substructure
+
+```python CSS_run.py -f .\examples\100042_MoS2.cif --vacuum-space 25.0```
+
+4. save slab (not just single layer) of identified substructures with specified thickness
+
+```python CSS_run.py -f .\examples\351_KCeS2.cif --save-slab --min-slab-thickness 25.0```
+
+5. example of the dependence of the identified 2-p substructure on the bond strength criteria
+
+```python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property BV```
+
+```python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property SA```
+
+```python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property A```
+
