@@ -14,7 +14,7 @@ from pymatgen.core.sites import PeriodicSite
 
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
-BV_PARAMETERS_EXCEL_TABLE_PATH = "./BV_estimated_23-04-2024.xlsx"  # Excel file with BV parameters
+BV_PARAMETERS_TABLE_PATH = "./BV_params_v230424.csv"  # csv file with BV parameters
 
 
 class StructureGraphAnalysisException(Exception):
@@ -52,16 +52,13 @@ class IntraContactsRestorationError(StructureGraphAnalysisException):
 
 
 try:
-    df_bvparams = pd.read_excel(BV_PARAMETERS_EXCEL_TABLE_PATH, index_col=0).loc[:,
-                  ['bond', 'Atom1', 'Atom2', 'confident_prediction',
-                   'Rcov_sum', 'delta', 'R0_estimated', 'R0_empirical', 'B']
-                  ]
+    df_bvparams = pd.read_csv(BV_PARAMETERS_TABLE_PATH)\
+                    .loc[:, ['bond', 'Atom1', 'Atom2', 'confident_prediction', 'Rcov_sum',
+                             'delta', 'R0_estimated', 'R0_empirical', 'B']]
 except FileNotFoundError:
-    print(f'Excel table with BV parameters has not been found at '
-          f'{BV_PARAMETERS_EXCEL_TABLE_PATH}')
+    print(f'Table with BV parameters was not found at {BV_PARAMETERS_TABLE_PATH}')
 else:
-    print(f'Excel table with BV parameters has been found at '
-          f'{BV_PARAMETERS_EXCEL_TABLE_PATH}')
+    print(f'Table with BV parameters was found at {BV_PARAMETERS_TABLE_PATH}')
 
 
 def calculate_BV(args: tuple[float, str, str]) -> tuple[float, str]:
@@ -82,24 +79,24 @@ def calculate_BV(args: tuple[float, str, str]) -> tuple[float, str]:
     """
     R, el1, el2 = args
 
-    empirical_bvs = df_bvparams[
+    bond_bv_params = df_bvparams[
         ((df_bvparams['Atom1'] == el1) & (df_bvparams['Atom2'] == el2)) |
         ((df_bvparams['Atom1'] == el2) & (df_bvparams['Atom2'] == el1))
     ]
     
-    if empirical_bvs.shape[0] == 0:
+    if bond_bv_params.shape[0] == 0:
         raise WeirdStructureException(f"No BV parameters for the contact {el1}..{el2}")
 
-    if empirical_bvs['R0_empirical'].notna().bool():
+    if bond_bv_params['R0_empirical'].notna().bool():
         # use R0_empirical
-        R0 = empirical_bvs.iat[0, 7]
-        B = empirical_bvs.iat[0, 8]
+        R0 = bond_bv_params.iat[0, 7]
+        B = bond_bv_params.iat[0, 8]
         data_source = 'empirical_and_extrapolated'
-    elif empirical_bvs['R0_empirical'].isna().bool():
+    elif bond_bv_params['R0_empirical'].isna().bool():
         # use R0_estimated
-        R0 = empirical_bvs.iat[0, 6]
+        R0 = bond_bv_params.iat[0, 6]
         B = 0.37
-        confidence = bool(empirical_bvs.iat[0, 3])
+        confidence = bool(bond_bv_params.iat[0, 3])
         data_source = f'ML_estimated (confidence: {confidence})'
     else:
         R0 = np.nan
