@@ -12,9 +12,9 @@ from datetime import datetime
 import pandas as pd
 from pymatgen.analysis.local_env import VoronoiNN
 
-import utils
-from StructureAnalyzer import CrystalSubstructureSearcher
-from structure_classes import CrystalSubstructureSearcherResults
+from css import utils
+from css.StructureAnalyzer import CrystalSubstructureSearcher
+from css.structure_classes import CrystalSubstructureSearcherResults
 
 warnings.filterwarnings('ignore')
 

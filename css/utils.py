@@ -14,7 +14,7 @@ from pymatgen.core.sites import PeriodicSite
 
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
-BV_PARAMETERS_TABLE_PATH = "./BV_params_v230424.csv"  # csv file with BV parameters
+BV_PARAMETERS_TABLE_PATH = "./css/data/BV_params_v230424.csv"  # csv file with BV parameters
 
 
 class StructureGraphAnalysisException(Exception):

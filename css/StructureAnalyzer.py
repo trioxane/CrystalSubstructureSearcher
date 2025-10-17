@@ -11,9 +11,9 @@ from pymatgen.analysis.graphs import StructureGraph
 from pymatgen.analysis.local_env import VoronoiNN
 from pymatgen.analysis.dimensionality import get_dimensionality_larsen, get_structure_components
 
-import utils
-from element_data import ALLRED_ROCHOW_EN_DICT, CORDERO_COVALENT_RADIUS_DICT, ALVAREZ_VDW_RADIUS_DICT
-from structure_classes import Substructure, CrystalSubstructures, TargetSubstructure, Contact
+from . import utils
+from .element_data import ALLRED_ROCHOW_EN_DICT, CORDERO_COVALENT_RADIUS_DICT, ALVAREZ_VDW_RADIUS_DICT
+from .structure_classes import Substructure, CrystalSubstructures, TargetSubstructure, Contact
 
 from time import time
 
