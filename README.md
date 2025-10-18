@@ -52,7 +52,9 @@ pip install -r requirements.txt
 
 ```python CSS_run.py -f examples/100042_MoS2.cif --vacuum-space 25.0```
 
-4. save slab (not just single layer) of identified substructures with specified ```
+4. save slab (not just single layer) of identified substructures with specified minimal slab thickness
+
+```python CSS_run.py -f examples/351_KCeS2.cif --target-periodicity 2 --save-slab --min-slab-thickness 25.0 ```
 
 5. example of the dependence of the identified 2-p substructure on the bond strength criteria
 
