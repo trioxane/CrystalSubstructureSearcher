@@ -27,7 +27,7 @@ The program uses an iterative edge-removal algorithm that progressively breaks t
 
 **Figure 1.** *The first iterations of the Ca2Sb structure (ICSD refcode 154) analysis leading to identification of the 2-periodic substructure. The bond valences are selected as edge weight in this example. The edges of the structure graph broken at each iteration are highlighted in red, their characteristics are shown in the table below. The edges restored at the final step are shown in green. BVS total is the sum of the bond valences of the retained edges in the graph components.*
 
-## Example usage
+## Usage examples
 
 1. simple run
 

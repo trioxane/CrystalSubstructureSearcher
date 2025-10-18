@@ -51,7 +51,7 @@ def main():
     run_results = []
     cif_files = glob.glob(str(Path(paths['input_cif_files_folder']) / "*.cif"))
 
-    for _, f in enumerate(cif_files):
+    for f in cif_files:
         filename = Path(f).stem
         tic = time.time()
 
