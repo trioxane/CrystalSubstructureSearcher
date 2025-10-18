@@ -54,4 +54,9 @@ python CSS_run.py -f .\examples\25626_AgCrSe2.cif --bond-property A
 ```
 
 6. batch run with parameters specified in the params.yaml file
+
 ```python CSS_batch_run.py```
+
+7. parallel run with parameters specified in the params.yaml file
+
+```python CSS_parallel_run.py -N 2 --folder examples -p params.yaml```
