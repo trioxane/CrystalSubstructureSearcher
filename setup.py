@@ -55,6 +55,7 @@ setup(
         'numpy==1.25.0',
         'pandas==2.0.3',
         'pymatgen==2025.1.24',
+        'openpyxl==3.1.5',
     ],
 
     # ===== CLASSIFIERS =====
