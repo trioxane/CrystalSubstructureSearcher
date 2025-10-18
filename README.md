@@ -9,7 +9,7 @@ The discovery of new two-dimensional materials is vital for advancing electronic
 
 ## Key Features
 
-- **Automated substructure identification**: Identifies 2D layers, 1D chains, and 0D molecular fragments within crystal structures
+- **Automated substructure identification**: Identifies 2D layers, and 1D chains fragments within crystal structures
 - **Graph-based analysis**: Constructs structure graphs using Voronoi tessellation to represent atomic connectivity
 - **Bond strength characterization**: Allows for selection of bond strength descriptors (distance, Voronoi face area, solid angle, bond valence) as proxies for bond strength
 - **Fragment charge estimation**: Analyzes electronegativity differences and bond valences to estimate charge distribution
