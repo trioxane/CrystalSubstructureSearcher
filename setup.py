@@ -43,12 +43,7 @@ setup(
     # ===== PACKAGE DATA =====
     # Include CSV and other data files in the package
     package_data={
-        'css': [
-            'data/*.csv',  # Include all CSV files from css/data/
-        ],
-        'examples': [
-            '*.cif'
-        ]
+        'css': ['data/*.csv'],  # Include all CSV files from css/data/
     },
     include_package_data=True,
     
