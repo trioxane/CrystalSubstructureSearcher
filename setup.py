@@ -46,6 +46,9 @@ setup(
         'css': [
             'data/*.csv',  # Include all CSV files from css/data/
         ],
+        'examples': [
+            '*.cif'
+        ]
     },
     include_package_data=True,
     
