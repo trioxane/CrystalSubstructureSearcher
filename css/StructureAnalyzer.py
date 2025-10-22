@@ -108,8 +108,8 @@ class CrystalSubstructureSearcher:
         # read_in_structure.to('readin.cif')
 
         print(
-            f"\n{'#'*60}\nInput structure filename: {self.crystal_graph_name}\n"
-            f"composition: {read_in_structure.composition.formula.replace(' ', '')}\n"
+            f"Input structure filename: {self.crystal_graph_name}\n"
+            f"composition: {read_in_structure.composition.formula.replace(' ', '')}"
             # f"space group: {read_in_structure.get_space_group_info()[0]}\n"
             # f"cell a_b_c: {read_in_structure.lattice.abc}\n"
             # f"cell alpha_beta_gamma: {read_in_structure.lattice.angles}\n"
