@@ -8,6 +8,8 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
+import logging
+import os
 
 import pandas as pd
 import ray
@@ -20,6 +22,12 @@ from css.StructureAnalyzer import CrystalSubstructureSearcher
 from css.structure_classes import CrystalSubstructureSearcherResults
 
 warnings.filterwarnings('ignore')
+
+# Suppress Ray logging
+os.environ["RAY_DEDUP_LOGS"] = "0"
+logging.getLogger("ray").setLevel(logging.ERROR)
+logging.getLogger("ray.tune").setLevel(logging.ERROR)
+logging.getLogger("ray.rllib").setLevel(logging.ERROR)
 
 
 def parse_arguments() -> argparse.Namespace:
