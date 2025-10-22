@@ -205,7 +205,7 @@ class TargetSubstructure(Substructure):
         if unique_component_indices:
             unique_component_indices = sorted(unique_component_indices)
 
-            print(f'\nunique_component_indices: {unique_component_indices}')
+            # print(f'\nunique_component_indices: {unique_component_indices}')
             self.unique_component_indices = unique_component_indices
 
         else:
@@ -624,10 +624,10 @@ class CrystalSubstructures:
                         frac_coord_thickness = component_sg.structure.frac_coords[:, 2].max() - component_sg.structure.frac_coords[:, 2].min()
                         # if layer is divided by cell ab plane, skip this layer
                         if frac_coord_thickness > 0.5:
-                            print(f'component {num_comp} is divided by unit cell', component_sg.structure.composition.formula.replace(" ", ""))
+                            # print(f'component {num_comp} is divided by unit cell', component_sg.structure.composition.formula.replace(" ", ""))
                             # print(component_sg.structure)
                             continue
-                        print(f'component {num_comp} is inside unit cell', component_sg.structure.composition.formula.replace(" ", ""))
+                        # print(f'component {num_comp} is inside unit cell', component_sg.structure.composition.formula.replace(" ", ""))
                         # print(component_sg.structure)
 
                         if first_layer:
@@ -695,7 +695,7 @@ class CrystalSubstructures:
 
                         # if layer is already completely inside the cell store right away the structure
                         if set([d[2][2] for d in component_sg.graph.edges(data='to_jimage')]) == {0}:
-                            print('layer is wholly inside unit cell')
+                            # print('layer is wholly inside unit cell')
 
                             if store_symmetrized_cell:
                                 (size_measure, geometric_layer_thickness, physical_layer_thickness,
@@ -708,7 +708,7 @@ class CrystalSubstructures:
 
                         # otherwise we need first to put the layer inside
                         else:
-                            print('layer is divided by unit cell borders')
+                            # print('layer is divided by unit cell borders')
 
                             # make supercell; the bond translation vectors "to_jimage" will be recalculated
                             g_new = component_sg * [1, 1, 2]
@@ -751,7 +751,7 @@ class CrystalSubstructures:
 
                         # if layer is already completely inside the cell store right away the structure
                         if set([(d[2][0], d[2][1]) for d in component_sg.graph.edges(data='to_jimage')]) == {(0, 0)}:
-                            print('chain is wholly inside unit cell')
+                            # print('chain is wholly inside unit cell')
                             # component_sg.structure.to('component_sg_1p.cif')
 
                             if store_symmetrized_cell:
@@ -764,7 +764,7 @@ class CrystalSubstructures:
 
                         # otherwise we need first to put the layer inside
                         else:
-                            print('chain is divided by unit cell borders')
+                            # print('chain is divided by unit cell borders')
 
                             # make supercell; the bond translation vectors "to_jimage" will be recalculated
                             g_new = component_sg * [2, 2, 1]

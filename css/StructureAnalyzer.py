@@ -210,13 +210,13 @@ class CrystalSubstructureSearcher:
                 print(f'Lattice will NOT be transformed')
             else:
                 print(f'Lattice will be transformed')
-                print(f'Total sites before: {self.structure.num_sites}')
-                print('LTM:')
-                print(f'{self._ltm}')
+                # print(f'Total sites before: {self.structure.num_sites}')
+                # print('LTM:')
+                # print(f'{self._ltm}')
 
                 # Apply transformation to the structure
                 self.structure.make_supercell(self._ltm)
-                print(f'Total sites after 1st transformation: {self.structure.num_sites}')
+                # print(f'Total sites after 1st transformation: {self.structure.num_sites}')
 
                 # Additional expansion depending on target periodicity
                 if self.target_periodicity == 2:
@@ -226,8 +226,8 @@ class CrystalSubstructureSearcher:
                 elif self.target_periodicity == 0:
                     self.structure.make_supercell((N, N, N))  # Expand in all three directions
 
-                print(f'Lattice was transformed')
-                print(f'Total sites after 2nd transformation: {self.structure.num_sites}')
+                # print(f'Lattice was transformed')
+                # print(f'Total sites after 2nd transformation: {self.structure.num_sites}')
 
         # Initialize an empty StructureGraph instance
         self.sg = StructureGraph.with_empty_graph(self.structure, name=f"CRYSTAL_GRAPH_{self.crystal_graph_name}")
@@ -381,7 +381,7 @@ class CrystalSubstructureSearcher:
                 orientation = component['orientation'] if component['orientation'] is not None else '_'
                 composition = component['structure_graph'].structure.composition.formula.replace(" ", "")
                 fragment_sites = component['site_ids']
-                print(f'Substructure {n+1}, {periodicity}-p component {i}: {orientation}, {composition}')
+                # print(f'Substructure {n+1}, {periodicity}-p component {i}: {orientation}, {composition}')
 
             # BV sum BEFORE restoring INTRA fragment contacts
             _edited_graph_total_bvs = self._calculate_SG_BV_sum(low_p_substructure['sg'])

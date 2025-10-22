@@ -187,15 +187,15 @@ def calculate_ltm_for_hkl(target_hkl, initial_lattice_vectors) -> Tuple[np.ndarr
     new_volume = abs(np.linalg.det(new_lattice_vectors))
 
     if np.linalg.det(new_lattice_vectors) < 0:
-        print("np.linalg.det(new_lattice_vectors) < 0")
+        # print("np.linalg.det(new_lattice_vectors) < 0")
         new_lattice_vectors *= -1
 
     # Ratio of volumes
     volume_ratio = new_volume / initial_volume
 
-    print(f"Initial Volume: {initial_volume:.1f}")
-    print(f"New Volume: {new_volume:.1f}")
-    print(f"Volume Ratio: {volume_ratio:.3f}")
+    # print(f"Initial Volume: {initial_volume:.1f}")
+    # print(f"New Volume: {new_volume:.1f}")
+    # print(f"Volume Ratio: {volume_ratio:.3f}")
 
     if volume_ratio > VOLUME_RATIO_THRESHOLD:
         raise SuperCellSearchError(f"Volume ratio {volume_ratio} exceeds the threshold {VOLUME_RATIO_THRESHOLD}.")
@@ -309,9 +309,9 @@ def calculate_ltm_for_uvw(target_uvw, initial_lattice_vectors, N=2) -> Tuple[np.
     # Ratio of volumes
     volume_ratio = new_volume / initial_volume
 
-    print(f"Initial Volume: {initial_volume:.1f}")
-    print(f"New Volume: {new_volume:.1f}")
-    print(f"Volume Ratio: {volume_ratio:.3f}")
+    # print(f"Initial Volume: {initial_volume:.1f}")
+    # print(f"New Volume: {new_volume:.1f}")
+    # print(f"Volume Ratio: {volume_ratio:.3f}")
 
     if volume_ratio > VOLUME_RATIO_THRESHOLD:
         raise SuperCellSearchError(f"Volume ratio {volume_ratio} exceeds the threshold {VOLUME_RATIO_THRESHOLD}.")
