@@ -24,7 +24,6 @@ from css.structure_classes import CrystalSubstructureSearcherResults
 warnings.filterwarnings('ignore')
 
 # Suppress Ray logging
-os.environ["RAY_DEDUP_LOGS"] = "0"
 logging.getLogger("ray").setLevel(logging.ERROR)
 logging.getLogger("ray.tune").setLevel(logging.ERROR)
 logging.getLogger("ray.rllib").setLevel(logging.ERROR)
@@ -47,7 +46,7 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
   python CSS_HPC_run.py -f /path/to/cifs --num-cpus 64 --params params.yaml
-  python CSS_HPC_run.py -f /path/to/cifs -n 128 -t 600
+  python CSS_HPC_run.py -f /path/to/cifs --num-cpus 128 --timeout 600
         """
     )
 
@@ -181,7 +180,7 @@ def main() -> None:
     args = parse_arguments()
 
     # === Initialize Ray ===
-    ray.init(num_cpus=args.num_cpus, )
+    ray.init(num_cpus=args.num_cpus)
     print(f"\n{'=' * 70}")
     print(f"Ray initialized with {args.num_cpus} CPUs")
     print(f"{'=' * 70}\n")
@@ -214,7 +213,7 @@ def main() -> None:
     total_files = len(cif_files)
     print(f"Found {total_files} CIF files to process")
     print(f"Timeout per task: {args.timeout} seconds\n")
-    print(f"Maximum total runtime: {args.max_runtime / 60:.1f} minutes")
+    print(f"Maximum total runtime: {args.max_runtime:.1f} minutes")
 
     # === Put config in Ray object store (shared memory, not copied) ===
     config_ref = ray.put(config)
@@ -226,7 +225,7 @@ def main() -> None:
     # === Collect results dynamically with progress tracking ===
     collected_results = []
     start_time = time.time()
-    max_end_time = start_time + args.max_runtime * 60
+    max_end_time = start_time + args.max_runtime * 60  # max-runtime in minutes
 
     print(f"{'=' * 70}")
     print("Processing files (dynamic load balancing)...")
@@ -237,9 +236,9 @@ def main() -> None:
         # Check if we've exceeded maximum runtime
         if max_end_time and time.time() >= max_end_time:
             print(f"\n{'!' * 70}")
-            print(f"⚠ Maximum runtime reached")
-            print(f"⚠ Stopping gracefully and saving {len(collected_results)} completed results")
-            print(f"⚠ {len(futures)} tasks will be cancelled")
+            print(f"!!! Maximum runtime reached")
+            print(f"!!! Stopping gracefully and saving {len(collected_results)} completed results")
+            print(f"!!! {len(futures)} tasks will be cancelled")
             print(f"{'!' * 70}\n")
 
             # Cancel remaining tasks
@@ -271,7 +270,7 @@ def main() -> None:
     if len(futures) == 0:
         print(f"✓ All {total_files} files processed successfully")
     else:
-        print(f"⚠ Completed {len(collected_results)}/{total_files} files before time limit")
+        print(f"!!! Completed {len(collected_results)}/{total_files} files before time limit")
         print(f"  {len(futures)} files were not processed")
     print(f"Total time: {(time.time() - start_time)/60:.2f} minutes")
     print(f"{'='*70}\n")
@@ -290,7 +289,7 @@ def main() -> None:
     # === Save raw results as JSON for backup ===
     json_output = f"CSS_HPC_results_{timestamp}.json"
     with open(json_output, "w") as f:
-        json.dump(collected_results, f, cls=utils.npEncoder, indent=2)
+        json.dump(collected_results, f, cls=utils.npEncoder, indent=4)
 
     # === Shutdown Ray ===
     ray.shutdown()
