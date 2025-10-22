@@ -110,9 +110,9 @@ class CrystalSubstructureSearcher:
         print(
             f"\n{'#'*60}\nInput structure filename: {self.crystal_graph_name}\n"
             f"composition: {read_in_structure.composition.formula.replace(' ', '')}\n"
-            f"space group: {read_in_structure.get_space_group_info()[0]}\n"
-            f"cell a_b_c: {read_in_structure.lattice.abc}\n"
-            f"cell alpha_beta_gamma: {read_in_structure.lattice.angles}\n"
+            # f"space group: {read_in_structure.get_space_group_info()[0]}\n"
+            # f"cell a_b_c: {read_in_structure.lattice.abc}\n"
+            # f"cell alpha_beta_gamma: {read_in_structure.lattice.angles}\n"
         )
 
         self._initial_cell = read_in_structure.copy()
@@ -370,8 +370,8 @@ class CrystalSubstructureSearcher:
             )
         ]
 
-        print('\nRestoring intracomponent contacts')
-        print(f'NUM_CONTACTS in original graph: {len(self.sg.graph.edges())}')
+        # print('\nRestoring intracomponent contacts')
+        # print(f'NUM_CONTACTS in original graph: {len(self.sg.graph.edges())}')
         for n, low_p_substructure in enumerate(low_periodic_substructures):
 
             for i, component in enumerate(
@@ -387,8 +387,8 @@ class CrystalSubstructureSearcher:
             _edited_graph_total_bvs = self._calculate_SG_BV_sum(low_p_substructure['sg'])
 
             tic = time()
-            print(f"NUM_CONTACTS in the edited graph: {len(low_p_substructure['sg'].graph.edges())}")
-            print(f"TOTAL_BVS in the edited graph: {_edited_graph_total_bvs:.3f}")
+            # print(f"NUM_CONTACTS in the edited graph: {len(low_p_substructure['sg'].graph.edges())}")
+            # print(f"TOTAL_BVS in the edited graph: {_edited_graph_total_bvs:.3f}")
 
             test_graph_1 = copy.copy(low_p_substructure['sg'])
             # Try to restore contacts iteratively starting from the strongest ones
@@ -448,10 +448,10 @@ class CrystalSubstructureSearcher:
             _restored_graph_total_bvs = self._calculate_SG_BV_sum(low_p_substructure['sg'])
 
             toc = time()
-            print(f"NUM_CONTACTS in the restored graph: {len(low_p_substructure['sg'].graph.edges())}")
-            print(f"TOTAL_BVS in the restored graph: {_restored_graph_total_bvs:.3f}")
-            print(f"NUM_INTER_CONTACTS: {len(inter_contacts)}")
-            print(f"TIME required to restore graph: {toc - tic:.1f} sec\n")
+            # print(f"NUM_CONTACTS in the restored graph: {len(low_p_substructure['sg'].graph.edges())}")
+            # print(f"TOTAL_BVS in the restored graph: {_restored_graph_total_bvs:.3f}")
+            # print(f"NUM_INTER_CONTACTS: {len(inter_contacts)}")
+            # print(f"TIME required to restore graph: {toc - tic:.1f} sec\n")
 
             # Store the restored substructure
             substructures[low_p_substructure['max_periodicity']].append(
@@ -485,14 +485,14 @@ class CrystalSubstructureSearcher:
         Raises:
             utils.IntraContactsRestorationError: If the periodicity changes unexpectedly after restoration.
         """
-        print('\nRestoring intracomponent contacts in TARGET SUBSTRUCTURE')
+        # print('\nRestoring intracomponent contacts in TARGET SUBSTRUCTURE')
 
         # BV sum BEFORE restoring INTRA fragment contacts
         _edited_graph_total_bvs = self._calculate_SG_BV_sum(target_substructure['sg'])
 
         tic = time()
-        print(f"NUM_CONTACTS in the edited graph: {len(target_substructure['sg'].graph.edges())}")
-        print(f"TOTAL_BVS in the edited graph: {_edited_graph_total_bvs:.3f}")
+        # print(f"NUM_CONTACTS in the edited graph: {len(target_substructure['sg'].graph.edges())}")
+        # print(f"TOTAL_BVS in the edited graph: {_edited_graph_total_bvs:.3f}")
 
         # first check if there are no crossing 2-p substructures (like in CoU6 ICSD 108323)
         self._check_plane_crossing(target_substructure['sg'])
@@ -537,10 +537,10 @@ class CrystalSubstructureSearcher:
         _restored_graph_total_bvs = self._calculate_SG_BV_sum(target_substructure['sg'])
 
         toc = time()
-        print(f"NUM_CONTACTS in the restored graph: {len(target_substructure['sg'].graph.edges())}")
-        print(f"TOTAL_BVS in the restored graph: {_restored_graph_total_bvs:.3f}")
-        print(f"NUM_INTER_CONTACTS: {len(self.sg.diff(target_substructure['sg'])['self'])}")
-        print(f"TIME required to restore graph: {toc - tic:.1f} sec")
+        # print(f"NUM_CONTACTS in the restored graph: {len(target_substructure['sg'].graph.edges())}")
+        # print(f"TOTAL_BVS in the restored graph: {_restored_graph_total_bvs:.3f}")
+        # print(f"NUM_INTER_CONTACTS: {len(self.sg.diff(target_substructure['sg'])['self'])}")
+        # print(f"TIME required to restore graph: {toc - tic:.1f} sec")
 
         # Return the restored target substructure
         restored_target_crystal_substructure = TargetSubstructure(

@@ -206,7 +206,7 @@ def main() -> None:
     total_files = len(cif_files)
     print(f"Found {total_files} CIF files to process")
     print(f"Timeout per task: {args.timeout} seconds\n")
-    print(f"Maximum total runtime: {args.max_runtime} minutes")
+    print(f"Maximum total runtime: {args.max_runtime / 60:.1f} minutes")
 
     # === Put config in Ray object store (shared memory, not copied) ===
     config_ref = ray.put(config)
@@ -246,7 +246,7 @@ def main() -> None:
         if ready_futures:
             # Get results from completed tasks
             results = ray.get(ready_futures)
-            collected_results.append(results)
+            collected_results.extend(results)
 
             # Update progress
             completed = len(collected_results)

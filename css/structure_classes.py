@@ -258,7 +258,7 @@ class TargetSubstructure(Substructure):
 
         self.component_charges = {idx: round(chg, 4) for idx, chg in sorted(component_charges.items())}
 
-        print(f'component_charges: {self.component_charges}\n')
+        # print(f'component_charges: {self.component_charges}\n')
 
         return None
 
@@ -445,8 +445,8 @@ class CrystalSubstructures:
                     layer_with_vacuum.frac_coords[:, 2].max() - layer_with_vacuum.frac_coords[:, 2].min()
             )
             physical_layer_thickness = geometric_layer_thickness + top_atom_radius + bottom_atom_radius
-            print(f"geometrical layer thickness: {geometric_layer_thickness:.2f} Angstrom")
-            print(f"physical layer thickness: {physical_layer_thickness:.2f} Angstrom")
+            # print(f"geometrical layer thickness: {geometric_layer_thickness:.2f} Angstrom")
+            # print(f"physical layer thickness: {physical_layer_thickness:.2f} Angstrom")
 
             new_lattice2 = [a_vec, b_vec, ab_normal * (vacuum_space + geometric_layer_thickness)]
 
@@ -474,14 +474,14 @@ class CrystalSubstructures:
                     layer_w_vacuum_symmetrised.frac_coords[:, 2].min()
             ) > 1 - 4/vacuum_space:
 
-                print('layer is divided')
+                # print('layer is divided')
                 layer_w_vacuum_symmetrised.translate_sites(
                     list(range(len(layer_w_vacuum_symmetrised))),
                     (0.0, 0.0, 0.5),
                     to_unit_cell=True,
                 )
             else:
-                print('layer is inside')
+                # print('layer is inside')
                 c_shift = layer_w_vacuum_symmetrised.frac_coords.mean(axis=0)[2]
                 # print('c_shift:', c_shift)
                 layer_w_vacuum_symmetrised.translate_sites(
@@ -490,7 +490,7 @@ class CrystalSubstructures:
                     to_unit_cell=True,
                 )
 
-            print(f"layer surface area: {S_A2:.1f} A2")
+            # print(f"layer surface area: {S_A2:.1f} A2")
 
             return S_A2, geometric_layer_thickness, physical_layer_thickness, layer_w_vacuum_symmetrised
 
@@ -550,7 +550,7 @@ class CrystalSubstructures:
                 to_unit_cell=True,
             )
 
-            print(f"chain length: {L_A:.1f} A")
+            # print(f"chain length: {L_A:.1f} A")
 
             return L_A, chain_with_vacuum
 
@@ -603,7 +603,7 @@ class CrystalSubstructures:
                     # structure_multiplied.structure.to('structure_multiplied.cif')
 
                     if len(get_structure_components(structure_multiplied)) % 2 != 0:
-                        print(f'!!! ERRONEOUS SLAB CREATION RESULT !!!:\n{len(get_structure_components(structure_multiplied))}')
+                        # print(f'!!! ERRONEOUS SLAB CREATION RESULT !!!:\n{len(get_structure_components(structure_multiplied))}')
                         PMG_ERROR = True
 
                     slab_frac_extreme_points = [0.0, 0.0]
@@ -643,7 +643,7 @@ class CrystalSubstructures:
                         slab_cart_thickness *= np.sin(np.deg2rad(structure_multiplied.structure.lattice.beta))
                         if slab_cart_thickness > min_slab_thickness:
                             break
-                    print("components_to_take:", len(components_to_take), "slab_cart_thickness:", slab_cart_thickness)
+                    # print("components_to_take:", len(components_to_take), "slab_cart_thickness:", slab_cart_thickness)
 
                     slab = components_to_take[0]
                     if len(components_to_take) > 1:
