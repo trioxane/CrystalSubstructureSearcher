@@ -206,10 +206,10 @@ class CrystalSubstructureSearcher:
         # Apply lattice transformation if requested and identified
         if transform_lattice:
 
-            if not self._ltm_is_identified:
-                print(f'Lattice will NOT be transformed')
-            else:
-                print(f'Lattice will be transformed')
+            # if not self._ltm_is_identified:
+                # print(f'Lattice will NOT be transformed')
+            # else:
+                # print(f'Lattice will be transformed')
                 # print(f'Total sites before: {self.structure.num_sites}')
                 # print('LTM:')
                 # print(f'{self._ltm}')
@@ -319,8 +319,8 @@ class CrystalSubstructureSearcher:
             periodicity = component['dimensionality']
             orientation = component['orientation'] if component['orientation'] is not None else '_'
             composition = component['structure_graph'].structure.composition.formula.replace(" ", "")
-            if verbose:
-                print(f'TARGET SUBSTRUCTURE {periodicity}-p component {i}: {orientation}, {composition}')
+            # if verbose:
+                # print(f'TARGET SUBSTRUCTURE {periodicity}-p component {i}: {orientation}, {composition}')
 
             if periodicity == 2:
                 _2p_substructures_orientations.add(orientation)
