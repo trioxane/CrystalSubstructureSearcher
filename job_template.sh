@@ -11,7 +11,7 @@
 
 
 # Activate virtual environment
-source /leonardo/home/userexternal/pzolotar/CrystalSubstructureSearcher_HPC/venv/bin/activate
+source {{VENV_ACTIVATE_PATH}}
 
 # Change to partition directory
 cd {{PARTITION_DIR}}
@@ -22,6 +22,6 @@ python3 {{SCRIPT_PATH}} \
     --num-cpus 1 \
     --timeout 120 \
     --max-runtime 1435 \
-    --params {{WORK_DIR}}/params.yaml
+    --params {{PARAMS_PATH}}
 
 exit $?
