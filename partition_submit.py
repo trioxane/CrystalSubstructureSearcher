@@ -40,8 +40,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         '-s', '--script',
         type=str,
-        default='CSS_HPC_run.py',
-        help='Python script to run (default: CSS_HPC_run.py)'
+        default='./CSS_HPC_run.py',
+        help='Path to python script to run (default: ./CSS_HPC_run.py)'
     )
     
     parser.add_argument(
@@ -86,8 +86,7 @@ def create_job_script(
     template_path: Path,
     partition_dir: Path,
     partition_id: int,
-    script_dir: Path,
-    script_name: str,
+    script_path: Path,
     work_dir: Path,
 ) -> Path:
     """
@@ -97,8 +96,7 @@ def create_job_script(
         template_path: Path to job template file
         partition_dir: Partition directory
         partition_id: Partition index
-        script_dir: Directory containing Python scripts
-        script_name: Name of Python script to run
+        script_path: Directory containing Python scripts
         params_file: Path to params.yaml
         work_dir: Working directory
         
@@ -111,8 +109,7 @@ def create_job_script(
     # Replace placeholders
     job_script_content = template.replace('{{PARTITION_ID}}', str(partition_id))
     job_script_content = job_script_content.replace('{{PARTITION_DIR}}', str(partition_dir))
-    job_script_content = job_script_content.replace('{{SCRIPT_DIR}}', str(script_dir))
-    job_script_content = job_script_content.replace('{{SCRIPT_NAME}}', script_name)
+    job_script_content = job_script_content.replace('{{SCRIPT_PATH}}', str(script_path))
     job_script_content = job_script_content.replace('{{WORK_DIR}}', str(work_dir))
     
     # Write job script
@@ -200,7 +197,6 @@ def main():
             template_file,
             partition_dir,
             i,
-            script_dir,
             args.script,
             work_dir,
         )

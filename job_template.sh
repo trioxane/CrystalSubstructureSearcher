@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=CSS_p{{PARTITION_ID}}
+#SBATCH --job-name=css_run_part{{PARTITION_ID}}
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -17,11 +17,11 @@ source /leonardo/home/userexternal/pzolotar/CrystalSubstructureSearcher_HPC/venv
 cd {{PARTITION_DIR}}
 
 # Run CSS script
-/leonardo/home/userexternal/pzolotar/CrystalSubstructureSearcher_HPC/venv/bin/python3 {{SCRIPT_DIR}}/{{SCRIPT_NAME}} \
+python3 {{SCRIPT_PATH}} \
     --folder {{PARTITION_DIR}} \
     --num-cpus 1 \
     --timeout 120 \
     --max-runtime 1435 \
-    --params params.yaml
+    --params {{WORK_DIR}}/params.yaml
 
 exit $?
