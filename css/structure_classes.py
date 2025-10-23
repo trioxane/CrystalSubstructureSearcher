@@ -17,6 +17,8 @@ from pymatgen.analysis.dimensionality import get_structure_components
 from . import utils
 from .element_data import get_element_grouping_dict, ALVAREZ_VDW_RADIUS_DICT, MAX_VALENCE_DICT
 
+import warnings
+warnings.filterwarnings('ignore')
 
 class Contact:
 

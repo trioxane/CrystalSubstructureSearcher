@@ -4,7 +4,6 @@
 import argparse
 import glob
 import time
-import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -21,9 +20,11 @@ from css import utils
 from css.StructureAnalyzer import CrystalSubstructureSearcher
 from css.structure_classes import CrystalSubstructureSearcherResults
 
+import warnings
 warnings.filterwarnings('ignore')
 
 # Suppress Ray logging
+os.environ["RAY_DEDUP_LOGS"] = "0"
 logging.getLogger("ray").setLevel(logging.ERROR)
 logging.getLogger("ray.tune").setLevel(logging.ERROR)
 logging.getLogger("ray.rllib").setLevel(logging.ERROR)
@@ -92,6 +93,7 @@ Examples:
 def process_single_cif(
         cif_file: str,
         config: Dict[str, Any],
+        connectivity_calculator: VoronoiNN
 ) -> Dict[str, Any]:
     """
     Run CrystalSubstructureSearcher calculation on a single CIF file.
@@ -107,19 +109,9 @@ def process_single_cif(
         Dictionary containing analysis results or error information
     """
     paths = config['paths']
-    conn_cfg = config['connectivity_calculation_parameters']
     graph_cfg = config['structure_graph_analysis_parameters']
     save_cfg = config['save_options']
     grouping_cfg = config['element_grouping']
-
-    # === Connectivity calculator ===
-    connectivity_calculator = VoronoiNN(
-        tol=conn_cfg['tol'],
-        cutoff=conn_cfg['cutoff'],
-        extra_nn_info=conn_cfg['extra_nn_info'],
-        allow_pathological=conn_cfg['allow_pathological'],
-        compute_adj_neighbors=conn_cfg['compute_adj_neighbors'],
-    )
 
     filename = Path(cif_file).stem
     tic = time.time()
@@ -215,17 +207,26 @@ def main() -> None:
     print(f"Timeout per task: {args.timeout} seconds\n")
     print(f"Maximum total runtime: {args.max_runtime:.1f} minutes")
 
-    # === Put config in Ray object store (shared memory, not copied) ===
+    # === Put config and Connectivity calculator in Ray object store (shared memory, not copied) ===
+    connectivity_calculator = VoronoiNN(
+        tol=config['connectivity_calculation_parameters']['tol'],
+        cutoff=config['connectivity_calculation_parameters']['cutoff'],
+        extra_nn_info=config['connectivity_calculation_parameters']['extra_nn_info'],
+        allow_pathological=config['connectivity_calculation_parameters']['allow_pathological'],
+        compute_adj_neighbors=config['connectivity_calculation_parameters']['compute_adj_neighbors'],
+    )
     config_ref = ray.put(config)
+    connectivity_calculator_ref = ray.put(connectivity_calculator)
 
     # === Submit all tasks ===
     print("Submitting tasks...")
-    futures = [process_single_cif.remote(cif_file, config_ref) for cif_file in cif_files]
+    futures = [process_single_cif.remote(cif_file, config_ref, connectivity_calculator_ref) for cif_file in cif_files]
 
     # === Collect results dynamically with progress tracking ===
     collected_results = []
     start_time = time.time()
-    max_end_time = start_time + args.max_runtime * 60  # max-runtime in minutes
+    max_end_time = start_time + args.max_runtime * 60  # max-runtime input in minutes
+    num_returns = 1
 
     print(f"{'=' * 70}")
     print("Processing files (dynamic load balancing)...")
@@ -247,8 +248,10 @@ def main() -> None:
 
             break
 
-        # Wait for at least one task to complete (or timeout)
-        ready_futures, remaining_futures = ray.wait(futures, num_returns=1, timeout=args.timeout)
+        # Wait for num_returns tasks to complete (or timeout)
+
+        ready_futures, remaining_futures = ray.wait(futures, num_returns=num_returns, timeout=args.timeout)
+        num_returns = min(10, len(remaining_futures))
 
         if ready_futures:
             # Get results from completed tasks
@@ -284,7 +287,7 @@ def main() -> None:
                 'geometric_layer_thickness', 'physical_layer_thickness', 'save_path']
     )
 
-    df_all_results.to_excel(f"CSS_HPC_results_{timestamp}.xlsx", index=False)
+    df_all_results.to_excel(f"CSS_HPC_results_{timestamp}.xlsx")
 
     # === Save raw results as JSON for backup ===
     json_output = f"CSS_HPC_results_{timestamp}.json"

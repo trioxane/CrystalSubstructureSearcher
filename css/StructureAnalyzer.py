@@ -17,6 +17,8 @@ from .structure_classes import Substructure, CrystalSubstructures, TargetSubstru
 
 from time import time
 
+import warnings
+warnings.filterwarnings('ignore')
 
 class CrystalSubstructureSearcher:
     """
