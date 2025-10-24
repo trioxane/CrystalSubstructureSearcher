@@ -208,7 +208,7 @@ def main() -> None:
 
     # Create work directory
     timestamp = datetime.now().strftime('%d-%m-%Y_%H-%M')
-    work_dir = script_dir / f"partitions_{timestamp}"
+    work_dir = script_dir / f"calculation_{timestamp}"
     work_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Work directory: {work_dir}")
@@ -241,7 +241,7 @@ def main() -> None:
         job_ids.append(job_id)
 
         print(f"  Partition {i}: Job {job_id}")
-        time.sleep(3)
+        time.sleep(2)
 
     print(f"\nSubmitted {len(job_ids)} jobs: {' '.join(job_ids)}")
     print(f"Results in: {work_dir}/partition_*/")

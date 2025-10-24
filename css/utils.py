@@ -1,6 +1,6 @@
 import itertools
 import json
-from typing import Tuple, Sequence
+from typing import Tuple, Sequence, Union
 from pathlib import Path
 from math import gcd
 

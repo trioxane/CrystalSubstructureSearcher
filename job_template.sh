@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=css_run_part{{PARTITION_ID}}
+#SBATCH --job-name=css_p{{PARTITION_ID}}
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
