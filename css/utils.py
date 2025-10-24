@@ -1,6 +1,7 @@
 import itertools
 import json
-from typing import Tuple, Sequence, Union
+from typing import Tuple, Sequence
+from pathlib import Path
 from math import gcd
 
 import pandas as pd
@@ -14,8 +15,16 @@ from pymatgen.core.sites import PeriodicSite
 
 VOLUME_RATIO_THRESHOLD = 10  # threshold for the volume ratio of the transformed cell to the initial unit cell
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters for WPs
-BV_PARAMETERS_TABLE_PATH = "./css/data/BV_params_v230424.csv"  # csv file with BV parameters
+BV_PARAMETERS_TABLE_PATH = Path(__file__).parent / "data" / "BV_params_v230424.csv"  # csv file with BV parameters
 
+try:
+    df_bvparams = pd.read_csv(BV_PARAMETERS_TABLE_PATH)\
+                    .loc[:, ['bond', 'Atom1', 'Atom2', 'confident_prediction', 'Rcov_sum',
+                             'delta', 'R0_estimated', 'R0_empirical', 'B']]
+except FileNotFoundError:
+    print(f'Table with BV parameters was not found at {BV_PARAMETERS_TABLE_PATH}')
+else:
+    print(f'Table with BV parameters was found at {BV_PARAMETERS_TABLE_PATH}')
 
 class StructureGraphAnalysisException(Exception):
     """
@@ -49,16 +58,6 @@ class IntraContactsRestorationError(StructureGraphAnalysisException):
     """
     Fragment dimensionality is not preserved during intracomponent contacts restoration
     """
-
-
-try:
-    df_bvparams = pd.read_csv(BV_PARAMETERS_TABLE_PATH)\
-                    .loc[:, ['bond', 'Atom1', 'Atom2', 'confident_prediction', 'Rcov_sum',
-                             'delta', 'R0_estimated', 'R0_empirical', 'B']]
-except FileNotFoundError:
-    print(f'Table with BV parameters was not found at {BV_PARAMETERS_TABLE_PATH}')
-else:
-    print(f'Table with BV parameters was found at {BV_PARAMETERS_TABLE_PATH}')
 
 
 def calculate_BV(args: tuple[float, str, str]) -> tuple[float, str]:
