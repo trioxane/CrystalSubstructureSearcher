@@ -241,7 +241,7 @@ def main() -> None:
         job_ids.append(job_id)
 
         print(f"  Partition {i}: Job {job_id}")
-        time.sleep(2)
+        time.sleep(3)
 
     print(f"\nSubmitted {len(job_ids)} jobs: {' '.join(job_ids)}")
     print(f"Results in: {work_dir}/partition_*/")

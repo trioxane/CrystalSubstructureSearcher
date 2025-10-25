@@ -20,8 +20,8 @@ cd {{PARTITION_DIR}}
 python3 {{SCRIPT_PATH}} \
     --folder {{PARTITION_DIR}} \
     --num-cpus 1 \
-    --timeout 120 \
-    --max-runtime 1435 \
+    --timeout 300 \
+    --max-runtime 1400 \
     --params {{PARAMS_PATH}}
 
 exit $?
